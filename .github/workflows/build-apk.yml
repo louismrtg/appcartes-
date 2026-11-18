@@ -74,8 +74,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
-          tag_name: v1.0.0-latest
-          name: Mes Cartes — Dernier APK Android
+          tag_name: v2.1.0
+          name: Mes Cartes v2.1.0 — APK Android
           body: |
             Build Android automatique généré depuis `${{ github.sha }}`.
             Téléchargez **`app-debug.apk`** ci-dessous pour installer **Mes Cartes** sur votre téléphone Android.

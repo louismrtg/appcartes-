@@ -2,13 +2,17 @@ import { Capacitor } from '@capacitor/core';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 class OrientationServiceImpl {
-  private isLockedLandscape = false;
+  private currentLock: 'landscape' | 'portrait' | 'unlocked' = 'unlocked';
 
   async lockLandscape(): Promise<boolean> {
+    if (this.currentLock === 'landscape') {
+      return true;
+    }
+
     if (Capacitor.isNativePlatform()) {
       try {
         await ScreenOrientation.lock({ orientation: 'landscape' });
-        this.isLockedLandscape = true;
+        this.currentLock = 'landscape';
         return true;
       } catch (err) {
         console.warn('[OrientationService] Échec du verrouillage paysage natif:', err);
@@ -22,19 +26,22 @@ class OrientationServiceImpl {
       };
       if (orientationApi && typeof orientationApi.lock === 'function') {
         await orientationApi.lock('landscape');
-        this.isLockedLandscape = true;
-        return true;
       }
     } catch {
-      // Sur navigateur desktop ou sans plein écran, la rotation visuelle CSS prend le relais.
+      // Sur navigateur desktop ou sans plein écran, l'interface reste utilisable.
     }
-    this.isLockedLandscape = true;
-    return false;
+    this.currentLock = 'landscape';
+    return true;
   }
 
-  async restorePortrait(): Promise<void> {
-    if (!this.isLockedLandscape) return;
-    this.isLockedLandscape = false;
+  async restorePortrait(keepLandscape = false): Promise<void> {
+    if (keepLandscape) {
+      await this.lockLandscape();
+      return;
+    }
+
+    if (this.currentLock === 'unlocked') return;
+    this.currentLock = 'unlocked';
 
     if (Capacitor.isNativePlatform()) {
       try {

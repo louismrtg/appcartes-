@@ -157,6 +157,38 @@ function patchStringsXml() {
   console.log('res/values/strings.xml mis a jour.');
 }
 
+function writeAdaptiveIconFiles() {
+  const drawableDir = path.join(ANDROID_MAIN, 'res', 'drawable');
+  const anydpiDir = path.join(ANDROID_MAIN, 'res', 'mipmap-anydpi-v26');
+  ensureDir(drawableDir);
+  ensureDir(anydpiDir);
+
+  fs.writeFileSync(
+    path.join(drawableDir, 'ic_launcher_background.xml'),
+    `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:startColor="#0B1120"
+        android:centerColor="#172554"
+        android:endColor="#1D4ED8"
+        android:type="linear" />
+</shape>
+`,
+    'utf8'
+  );
+
+  const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+`;
+  fs.writeFileSync(path.join(anydpiDir, 'ic_launcher.xml'), adaptiveXml, 'utf8');
+  fs.writeFileSync(path.join(anydpiDir, 'ic_launcher_round.xml'), adaptiveXml, 'utf8');
+  console.log('Icone adaptative Android mise a jour.');
+}
+
 function writeWidgetAndBridgeFiles() {
   const drawableDir = path.join(ANDROID_MAIN, 'res', 'drawable');
   const layoutDir = path.join(ANDROID_MAIN, 'res', 'layout');
@@ -173,14 +205,29 @@ function writeWidgetAndBridgeFiles() {
   removeIfExists(path.join(layoutDir, 'widget_mes_cartes.xml'));
   removeIfExists(path.join(xmlDir, 'mes_cartes_widget_info.xml'));
 
-  // Drawables propres (compatibles Motorola Launcher & Material You)
+  // Drawables modernes Material You / Wallet
   fs.writeFileSync(
     path.join(drawableDir, 'widget_bg.xml'),
     `<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#16181F" />
-    <corners android:radius="24dp" />
-    <stroke android:width="1dp" android:color="#2A2E3A" />
+    <gradient
+        android:angle="315"
+        android:startColor="#0F172A"
+        android:endColor="#1E293B"
+        android:type="linear" />
+    <corners android:radius="28dp" />
+    <stroke android:width="1dp" android:color="#334155" />
+</shape>
+`,
+    'utf8'
+  );
+
+  fs.writeFileSync(
+    path.join(drawableDir, 'widget_pill_btn.xml'),
+    `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#26FFFFFF" />
+    <corners android:radius="50dp" />
 </shape>
 `,
     'utf8'
@@ -190,8 +237,12 @@ function writeWidgetAndBridgeFiles() {
     path.join(drawableDir, 'widget_card_pill.xml'),
     `<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#2563EB" />
-    <corners android:radius="16dp" />
+    <gradient
+        android:angle="315"
+        android:startColor="#2563EB"
+        android:endColor="#1E3A8A"
+        android:type="linear" />
+    <corners android:radius="18dp" />
 </shape>
 `,
     'utf8'
@@ -202,7 +253,7 @@ function writeWidgetAndBridgeFiles() {
     `<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="#FFFFFF" />
-    <corners android:radius="14dp" />
+    <corners android:radius="20dp" />
 </shape>
 `,
     'utf8'
@@ -232,7 +283,7 @@ function writeWidgetAndBridgeFiles() {
     `<?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
-    android:minHeight="110dp"
+    android:minHeight="120dp"
     android:targetCellWidth="4"
     android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
@@ -244,7 +295,7 @@ function writeWidgetAndBridgeFiles() {
     'utf8'
   );
 
-  // Layout XML Widget 1 (Acces Rapide 3 Cartes)
+  // Layout XML Widget 1 : Cartes arrondies avec degrade rendu par Bitmap (aucun rectangle coupe)
   fs.writeFileSync(
     path.join(layoutDir, 'widget_quick_cards.xml'),
     `<?xml version="1.0" encoding="utf-8"?>
@@ -276,9 +327,12 @@ function writeWidgetAndBridgeFiles() {
             android:id="@+id/quick_open_wallet"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Ouvrir"
-            android:textColor="#93C5FD"
-            android:textSize="12sp"
+            android:background="@drawable/widget_pill_btn"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:text="Portefeuille"
+            android:textColor="#E2E8F0"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -289,110 +343,143 @@ function writeWidgetAndBridgeFiles() {
         android:gravity="center"
         android:orientation="horizontal">
 
-        <LinearLayout
+        <FrameLayout
             android:id="@+id/quick_slot_1"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_card_pill"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1">
 
-            <TextView
-                android:id="@+id/quick_slot_1_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Carte 1"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/quick_slot_1_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="Fond carte 1"
+                android:scaleType="fitXY" />
 
-            <TextView
-                android:id="@+id/quick_slot_1_sub"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Afficher"
-                android:textColor="#E2E8F0"
-                android:textSize="11sp" />
-        </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="bottom|start"
+                android:orientation="vertical"
+                android:padding="10dp">
 
-        <LinearLayout
+                <TextView
+                    android:id="@+id/quick_slot_1_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Carte 1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/quick_slot_1_sub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Ouvrir"
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <FrameLayout
             android:id="@+id/quick_slot_2"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_card_pill"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1">
 
-            <TextView
-                android:id="@+id/quick_slot_2_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Carte 2"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/quick_slot_2_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="Fond carte 2"
+                android:scaleType="fitXY" />
 
-            <TextView
-                android:id="@+id/quick_slot_2_sub"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Afficher"
-                android:textColor="#E2E8F0"
-                android:textSize="11sp" />
-        </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="bottom|start"
+                android:orientation="vertical"
+                android:padding="10dp">
 
-        <LinearLayout
+                <TextView
+                    android:id="@+id/quick_slot_2_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Carte 2"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/quick_slot_2_sub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Ouvrir"
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <FrameLayout
             android:id="@+id/quick_slot_3"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/widget_card_pill"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
+            android:layout_weight="1">
 
-            <TextView
-                android:id="@+id/quick_slot_3_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Carte 3"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/quick_slot_3_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="Fond carte 3"
+                android:scaleType="fitXY" />
 
-            <TextView
-                android:id="@+id/quick_slot_3_sub"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Afficher"
-                android:textColor="#E2E8F0"
-                android:textSize="11sp" />
-        </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="bottom|start"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:id="@+id/quick_slot_3_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Carte 3"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/quick_slot_3_sub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Ouvrir"
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 </LinearLayout>
 `,
     'utf8'
   );
 
-  // Layout XML Widget 2 (Carte Favorite Directe avec code-barres)
+  // Layout XML Widget 2 (Carte Favorite Directe avec badge couleur + code-barres plein cadre)
   fs.writeFileSync(
     path.join(layoutDir, 'widget_barcode_direct.xml'),
     `<?xml version="1.0" encoding="utf-8"?>
@@ -409,7 +496,14 @@ function writeWidgetAndBridgeFiles() {
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingBottom="6dp">
+        android:paddingBottom="8dp">
+
+        <ImageView
+            android:id="@+id/barcode_widget_accent"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="Couleur carte" />
 
         <TextView
             android:id="@+id/barcode_widget_title"
@@ -427,9 +521,13 @@ function writeWidgetAndBridgeFiles() {
             android:id="@+id/barcode_widget_brand"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:background="@drawable/widget_pill_btn"
+            android:paddingHorizontal="9dp"
+            android:paddingVertical="3dp"
             android:text="Mes Cartes"
-            android:textColor="#94A3B8"
-            android:textSize="11sp" />
+            android:textColor="#E2E8F0"
+            android:textSize="10sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <LinearLayout
@@ -439,8 +537,8 @@ function writeWidgetAndBridgeFiles() {
         android:background="@drawable/widget_white_box"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingHorizontal="10dp"
-        android:paddingVertical="6dp">
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp">
 
         <ImageView
             android:id="@+id/barcode_widget_image"
@@ -454,20 +552,21 @@ function writeWidgetAndBridgeFiles() {
             android:id="@+id/barcode_widget_number"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:text="Selectionnez une carte"
+            android:text="Appuyez pour ouvrir"
             android:textColor="#0F172A"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:typeface="monospace" />
     </LinearLayout>
 </LinearLayout>
 `,
     'utf8'
   );
 
-  // Java Provider 1 : MesCartesQuickWidgetProvider
+  // Java Provider 1 : MesCartesQuickWidgetProvider avec rendu Bitmap arrondi degrade
   fs.writeFileSync(
     path.join(javaDir, 'MesCartesQuickWidgetProvider.java'),
     `package com.famille.mescartes;
@@ -478,7 +577,13 @@ import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.net.Uri;
 import android.os.Build;
 import android.view.View;
@@ -512,6 +617,7 @@ public class MesCartesQuickWidgetProvider extends AppWidgetProvider {
         String rawJson = prefs.getString(WIDGET_PAYLOAD_KEY, "[]");
 
         int[] slotIds = { R.id.quick_slot_1, R.id.quick_slot_2, R.id.quick_slot_3 };
+        int[] bgIds = { R.id.quick_slot_1_bg, R.id.quick_slot_2_bg, R.id.quick_slot_3_bg };
         int[] titleIds = { R.id.quick_slot_1_title, R.id.quick_slot_2_title, R.id.quick_slot_3_title };
         int[] subIds = { R.id.quick_slot_1_sub, R.id.quick_slot_2_sub, R.id.quick_slot_3_sub };
 
@@ -528,11 +634,7 @@ public class MesCartesQuickWidgetProvider extends AppWidgetProvider {
                     views.setViewVisibility(slotIds[i], View.VISIBLE);
                     views.setTextViewText(titleIds[i], customName);
                     views.setTextViewText(subIds[i], brandName);
-                    try {
-                        views.setInt(slotIds[i], "setBackgroundColor", Color.parseColor(colorHex));
-                    } catch (IllegalArgumentException ignored) {
-                        views.setInt(slotIds[i], "setBackgroundColor", Color.parseColor("#2563EB"));
-                    }
+                    views.setImageViewBitmap(bgIds[i], drawRoundedCardBitmap(colorHex));
 
                     Intent cardIntent = new Intent(
                         Intent.ACTION_VIEW,
@@ -548,8 +650,8 @@ public class MesCartesQuickWidgetProvider extends AppWidgetProvider {
                 } else if (cards.length() == 0 && i == 0) {
                     views.setViewVisibility(slotIds[i], View.VISIBLE);
                     views.setTextViewText(titleIds[i], "Ajouter une carte");
-                    views.setTextViewText(subIds[i], "Ouvrir");
-                    views.setInt(slotIds[i], "setBackgroundColor", Color.parseColor("#2563EB"));
+                    views.setTextViewText(subIds[i], "Ouvrir le portefeuille");
+                    views.setImageViewBitmap(bgIds[i], drawRoundedCardBitmap("#2563EB"));
                     views.setOnClickPendingIntent(
                         slotIds[i],
                         createPendingIntent(context, 3000 + appWidgetId, openAppIntent)
@@ -562,6 +664,7 @@ public class MesCartesQuickWidgetProvider extends AppWidgetProvider {
             views.setViewVisibility(slotIds[0], View.VISIBLE);
             views.setTextViewText(titleIds[0], "Mes Cartes");
             views.setTextViewText(subIds[0], "Ouvrir");
+            views.setImageViewBitmap(bgIds[0], drawRoundedCardBitmap("#2563EB"));
             views.setOnClickPendingIntent(
                 slotIds[0],
                 createPendingIntent(context, 4000 + appWidgetId, openAppIntent)
@@ -571,6 +674,45 @@ public class MesCartesQuickWidgetProvider extends AppWidgetProvider {
         }
 
         appWidgetManager.updateAppWidget(appWidgetId, views);
+    }
+
+    private static Bitmap drawRoundedCardBitmap(String hex) {
+        int baseColor;
+        try {
+            baseColor = Color.parseColor(hex);
+        } catch (IllegalArgumentException e) {
+            baseColor = Color.parseColor("#2563EB");
+        }
+        int darkerColor = Color.rgb(
+            Math.max(0, (int) (Color.red(baseColor) * 0.58)),
+            Math.max(0, (int) (Color.green(baseColor) * 0.58)),
+            Math.max(0, (int) (Color.blue(baseColor) * 0.58))
+        );
+
+        int w = 360;
+        int h = 220;
+        float radius = 38f;
+        Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setShader(new LinearGradient(0, 0, w, h, baseColor, darkerColor, Shader.TileMode.CLAMP));
+        RectF rect = new RectF(2f, 2f, w - 2f, h - 2f);
+        canvas.drawRoundRect(rect, radius, radius, paint);
+
+        // Reflet subtil en haut a droite
+        Paint gloss = new Paint(Paint.ANTI_ALIAS_FLAG);
+        gloss.setColor(Color.argb(34, 255, 255, 255));
+        canvas.drawCircle(w * 0.85f, h * 0.12f, w * 0.34f, gloss);
+
+        // Bordure legere
+        Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        stroke.setStyle(Paint.Style.STROKE);
+        stroke.setStrokeWidth(2.5f);
+        stroke.setColor(Color.argb(72, 255, 255, 255));
+        canvas.drawRoundRect(rect, radius, radius, stroke);
+
+        return bmp;
     }
 
     private static PendingIntent createPendingIntent(Context context, int requestCode, Intent intent) {
@@ -585,7 +727,7 @@ public class MesCartesQuickWidgetProvider extends AppWidgetProvider {
     'utf8'
   );
 
-  // Java Provider 2 : MesCartesBarcodeWidgetProvider (avec generation Bitmap ZXing)
+  // Java Provider 2 : MesCartesBarcodeWidgetProvider avec pastille couleur + code-barres haute resolution
   fs.writeFileSync(
     path.join(javaDir, 'MesCartesBarcodeWidgetProvider.java'),
     `package com.famille.mescartes;
@@ -597,7 +739,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Build;
 import android.view.View;
@@ -647,12 +791,14 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
                 String cardId = selected.optString("id", "");
                 String brandName = selected.optString("brandName", "Mes Cartes");
                 String customName = selected.optString("customName", brandName);
+                String colorHex = selected.optString("primaryColor", "#2563EB");
                 String barcodeValue = selected.optString("barcodeValue", "");
                 String formatStr = selected.optString("barcodeFormat", "CODE_128");
 
                 views.setTextViewText(R.id.barcode_widget_title, customName);
                 views.setTextViewText(R.id.barcode_widget_brand, brandName);
                 views.setTextViewText(R.id.barcode_widget_number, barcodeValue);
+                views.setImageViewBitmap(R.id.barcode_widget_accent, drawDotBitmap(colorHex));
 
                 Bitmap bmp = renderBarcodeBitmap(barcodeValue, formatStr);
                 if (bmp != null) {
@@ -677,6 +823,7 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
                 views.setTextViewText(R.id.barcode_widget_title, "Carte Favorite Directe");
                 views.setTextViewText(R.id.barcode_widget_brand, "Mes Cartes");
                 views.setTextViewText(R.id.barcode_widget_number, "Epinglez une carte dans Parametres");
+                views.setImageViewBitmap(R.id.barcode_widget_accent, drawDotBitmap("#2563EB"));
                 views.setViewVisibility(R.id.barcode_widget_image, View.GONE);
                 views.setOnClickPendingIntent(
                     R.id.barcode_widget_root,
@@ -686,6 +833,7 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
         } catch (Exception e) {
             views.setTextViewText(R.id.barcode_widget_title, "Mes Cartes");
             views.setTextViewText(R.id.barcode_widget_number, "Appuyez pour ouvrir");
+            views.setImageViewBitmap(R.id.barcode_widget_accent, drawDotBitmap("#2563EB"));
             views.setViewVisibility(R.id.barcode_widget_image, View.GONE);
             views.setOnClickPendingIntent(
                 R.id.barcode_widget_root,
@@ -696,12 +844,31 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
         appWidgetManager.updateAppWidget(appWidgetId, views);
     }
 
+    private static Bitmap drawDotBitmap(String hex) {
+        int color;
+        try {
+            color = Color.parseColor(hex);
+        } catch (IllegalArgumentException e) {
+            color = Color.parseColor("#2563EB");
+        }
+        Bitmap bmp = Bitmap.createBitmap(42, 42, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setColor(color);
+        canvas.drawCircle(21f, 21f, 18f, p);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(3f);
+        p.setColor(Color.argb(140, 255, 255, 255));
+        canvas.drawCircle(21f, 21f, 18f, p);
+        return bmp;
+    }
+
     private static Bitmap renderBarcodeBitmap(String value, String formatStr) {
         if (value == null || value.trim().isEmpty()) return null;
         BarcodeFormat format = mapFormat(formatStr);
         boolean is2d = format == BarcodeFormat.QR_CODE || format == BarcodeFormat.DATA_MATRIX;
-        int width = is2d ? 280 : 600;
-        int height = is2d ? 280 : 140;
+        int width = is2d ? 360 : 800;
+        int height = is2d ? 360 : 200;
 
         MultiFormatWriter writer = new MultiFormatWriter();
         BitMatrix matrix;
@@ -709,7 +876,7 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
             matrix = writer.encode(value, format, width, height);
         } catch (Exception firstError) {
             try {
-                matrix = writer.encode(value, BarcodeFormat.CODE_128, 600, 140);
+                matrix = writer.encode(value, BarcodeFormat.CODE_128, 800, 200);
             } catch (Exception secondError) {
                 return null;
             }
@@ -840,6 +1007,7 @@ function patchGradleMinSdkIfNeeded() {
 patchAppBuildGradle();
 patchManifest();
 patchStringsXml();
+writeAdaptiveIconFiles();
 writeWidgetAndBridgeFiles();
 patchGradleMinSdkIfNeeded();
 console.log('Configuration Android terminee avec succes.');

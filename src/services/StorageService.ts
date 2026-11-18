@@ -19,9 +19,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   largeText: false,
   highContrast: false,
   autoLandscape: true,
+  forceLandscapeCheckout: true,
+  lockAppLandscape: false,
   autoMaxBrightness: true,
   keepAwake: true,
-  hapticFeedback: true,
+  hapticFeedback: false,
+  hapticMigrated: true,
+  sortMode: 'default',
   lockOnStartup: true,
   lockScope: 'app',
   biometricEnabled: true,
@@ -120,7 +124,14 @@ class StorageServiceImpl {
     try {
       const { value } = await Preferences.get({ key: SETTINGS_KEY });
       if (!value) return { ...DEFAULT_SETTINGS };
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(value) };
+      const parsed = JSON.parse(value) as Partial<AppSettings>;
+      const merged: AppSettings = { ...DEFAULT_SETTINGS, ...parsed };
+      if (parsed.hapticMigrated !== true) {
+        merged.hapticFeedback = false;
+        merged.hapticMigrated = true;
+        await this.saveSettings(merged);
+      }
+      return merged;
     } catch {
       return { ...DEFAULT_SETTINGS };
     }
@@ -147,6 +158,38 @@ class StorageServiceImpl {
 
   async deleteCard(cardId: string): Promise<void> {
     await db.cards.delete(cardId);
+  }
+
+  async bulkDeleteCards(cardIds: string[]): Promise<void> {
+    if (cardIds.length === 0) return;
+    await db.cards.bulkDelete(cardIds);
+  }
+
+  async bulkUpdateCardsFolders(
+    cardIds: string[],
+    addFolderIds: string[],
+    removeFolderIds: string[]
+  ): Promise<void> {
+    if (cardIds.length === 0) return;
+    await db.transaction('rw', db.cards, async () => {
+      const targets = (await db.cards.bulkGet(cardIds)).filter(
+        (c): c is LoyaltyCard => Boolean(c)
+      );
+      const now = Date.now();
+      const updated = targets.map((card) => {
+        const current = new Set(getCardFolderIds(card));
+        removeFolderIds.forEach((id) => current.delete(id));
+        addFolderIds.forEach((id) => current.add(id));
+        const nextIds = Array.from(current);
+        return {
+          ...card,
+          folderId: nextIds[0] || '',
+          folderIds: nextIds,
+          updatedAt: now,
+        };
+      });
+      await db.cards.bulkPut(updated);
+    });
   }
 
   async incrementCardUsage(cardId: string): Promise<LoyaltyCard | undefined> {

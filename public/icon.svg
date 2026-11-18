@@ -1,29 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1d4ed8"/>
-      <stop offset="55%" stop-color="#2563eb"/>
-      <stop offset="100%" stop-color="#0f172a"/>
+      <stop offset="0%" stop-color="#0B1120"/>
+      <stop offset="55%" stop-color="#172554"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
     </linearGradient>
-    <linearGradient id="card" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.98"/>
-      <stop offset="100%" stop-color="#e2e8f0" stop-opacity="0.95"/>
+    <linearGradient id="backCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="frontCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E2E8F0"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <rect x="86" y="138" width="340" height="218" rx="28" fill="#60a5fa" opacity="0.35" transform="rotate(-7 256 247)"/>
-  <rect x="86" y="150" width="340" height="218" rx="28" fill="url(#card)"/>
-  <rect x="122" y="256" width="18" height="72" rx="4" fill="#0f172a"/>
-  <rect x="150" y="256" width="10" height="72" rx="3" fill="#0f172a"/>
-  <rect x="170" y="256" width="24" height="72" rx="4" fill="#0f172a"/>
-  <rect x="206" y="256" width="12" height="72" rx="3" fill="#0f172a"/>
-  <rect x="230" y="256" width="20" height="72" rx="4" fill="#0f172a"/>
-  <rect x="262" y="256" width="10" height="72" rx="3" fill="#0f172a"/>
-  <rect x="284" y="256" width="26" height="72" rx="4" fill="#0f172a"/>
-  <rect x="322" y="256" width="14" height="72" rx="3" fill="#0f172a"/>
-  <rect x="348" y="256" width="22" height="72" rx="4" fill="#0f172a"/>
-  <circle cx="144" cy="200" r="22" fill="#2563eb"/>
-  <path d="M135 200l6 6 12-13" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="184" y="186" width="120" height="14" rx="7" fill="#1e293b"/>
-  <rect x="184" y="210" width="76" height="10" rx="5" fill="#94a3b8"/>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <g transform="rotate(-8 256 248)">
+    <rect x="96" y="136" width="320" height="202" rx="30" fill="url(#backCard)" opacity="0.82"/>
+  </g>
+  <rect x="92" y="168" width="328" height="206" rx="32" fill="url(#frontCard)"/>
+  <rect x="128" y="200" width="52" height="36" rx="10" fill="#2563EB"/>
+  <rect x="198" y="206" width="128" height="12" rx="6" fill="#0F172A" opacity="0.85"/>
+  <rect x="198" y="226" width="84" height="8" rx="4" fill="#64748B" opacity="0.65"/>
+  <g fill="#0F172A">
+    <rect x="128" y="274" width="18" height="66" rx="4"/>
+    <rect x="156" y="274" width="10" height="66" rx="3"/>
+    <rect x="176" y="274" width="24" height="66" rx="4"/>
+    <rect x="210" y="274" width="12" height="66" rx="3"/>
+    <rect x="232" y="274" width="22" height="66" rx="4"/>
+    <rect x="264" y="274" width="10" height="66" rx="3"/>
+    <rect x="284" y="274" width="26" height="66" rx="4"/>
+    <rect x="320" y="274" width="14" height="66" rx="3"/>
+    <rect x="344" y="274" width="20" height="66" rx="4"/>
+    <rect x="372" y="274" width="12" height="66" rx="3"/>
+  </g>
 </svg>

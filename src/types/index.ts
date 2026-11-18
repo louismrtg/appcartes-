@@ -1,3 +1,8 @@
+export const APP_VERSION = '2.1.0';
+export const GITHUB_REPO = 'louismrtg/appcartes-';
+
+export type SortMode = 'default' | 'most_used' | 'recent' | 'alpha';
+
 export type BarcodeFormat =
   | 'EAN_13'
   | 'EAN_8'
@@ -95,9 +100,13 @@ export interface AppSettings {
   largeText: boolean;
   highContrast: boolean;
   autoLandscape: boolean;
+  forceLandscapeCheckout: boolean;
+  lockAppLandscape: boolean;
   autoMaxBrightness: boolean;
   keepAwake: boolean;
   hapticFeedback: boolean;
+  hapticMigrated?: boolean;
+  sortMode: SortMode;
   lockOnStartup: boolean;
   lockScope: LockScope;
   biometricEnabled: boolean;

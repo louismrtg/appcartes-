@@ -6,6 +6,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    chunkSizeWarningLimit: 1200,
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'framer-motion'],
+          'vendor-barcode': ['jsbarcode', 'qrcode.react'],
+          'vendor-scanner': ['html5-qrcode'],
+          'vendor-bwip': ['bwip-js/browser'],
+        },
+      },
+    },
   },
 });

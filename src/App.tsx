@@ -1,26 +1,62 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { Clock, CreditCard, Menu, Plus, Search, X } from 'lucide-react';
+import {
+  ArrowUpDown,
+  Check,
+  Clock,
+  CreditCard,
+  FolderPlus,
+  Menu,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   AppSettings,
   CardFolder,
   DrawerFilter,
   LoyaltyCard,
+  SortMode,
   getCardFolderIds,
 } from './types';
 import { DEFAULT_SETTINGS, StorageService } from './services/StorageService';
 import { WidgetService } from './services/WidgetService';
 import { HapticService } from './services/HapticService';
 import { BiometricService } from './services/BiometricService';
-import { NavigationDrawer } from './components/NavigationDrawer';
+import { OrientationService } from './services/OrientationService';
 import { LoyaltyCardItem } from './components/LoyaltyCardItem';
 import { BrandLogo } from './components/BrandLogo';
-import { CardCheckoutModal } from './components/CardCheckoutModal';
-import { AddCardModal } from './components/AddCardModal';
-import { SettingsModal } from './components/SettingsModal';
-import { SecurityLockModal } from './components/SecurityLockModal';
+
+const NavigationDrawer = lazy(() =>
+  import('./components/NavigationDrawer').then((m) => ({ default: m.NavigationDrawer }))
+);
+const CardCheckoutModal = lazy(() =>
+  import('./components/CardCheckoutModal').then((m) => ({ default: m.CardCheckoutModal }))
+);
+const AddCardModal = lazy(() =>
+  import('./components/AddCardModal').then((m) => ({ default: m.AddCardModal }))
+);
+const SettingsModal = lazy(() =>
+  import('./components/SettingsModal').then((m) => ({ default: m.SettingsModal }))
+);
+const BulkCategoryModal = lazy(() =>
+  import('./components/BulkCategoryModal').then((m) => ({ default: m.BulkCategoryModal }))
+);
+const SecurityLockModal = lazy(() =>
+  import('./components/SecurityLockModal').then((m) => ({ default: m.SecurityLockModal }))
+);
+
+const SORT_LABELS: Record<SortMode, string> = {
+  default: 'Favoris',
+  recent: 'Récentes',
+  most_used: 'Fréquentes',
+  alpha: 'A – Z',
+};
+
+const SORT_ORDER: SortMode[] = ['default', 'recent', 'most_used', 'alpha'];
 
 function getTimeGreeting(): { title: string; subtitle: string } {
   const hour = new Date().getHours();
@@ -63,12 +99,19 @@ export function App() {
   const [editingCard, setEditingCard] = useState<LoyaltyCard | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
+  // Sélection multiple (appui long)
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
+  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+
   const [appLocked, setAppLocked] = useState(false);
   const [unlockedPrivateFolders, setUnlockedPrivateFolders] = useState<Record<string, boolean>>({});
   const [pendingPrivateFolderId, setPendingPrivateFolderId] = useState<string | null>(null);
 
   const edgeSwipeStartX = useRef<number | null>(null);
   const backgroundTimestampRef = useRef<number | null>(null);
+
+  const selectionMode = selectedCardIds.length > 0;
 
   const reloadDatabase = useCallback(async () => {
     const data = await StorageService.initialize();
@@ -104,6 +147,16 @@ export function App() {
       mounted = false;
     };
   }, [reloadDatabase, canLockDevice]);
+
+  // Verrouillage global en Paysage si activé dans les paramètres
+  useEffect(() => {
+    if (loading || checkoutCard) return;
+    if (settings.lockAppLandscape) {
+      OrientationService.lockLandscape();
+    } else {
+      OrientationService.restorePortrait(false);
+    }
+  }, [loading, settings.lockAppLandscape, checkoutCard]);
 
   // Verrouillage automatique après 30 secondes en arrière-plan
   useEffect(() => {
@@ -154,6 +207,18 @@ export function App() {
       }
     };
   }, [settings, canLockDevice]);
+
+  // Touche Retour Android : quitte le mode sélection s'il est actif
+  useEffect(() => {
+    if (!selectionMode || !Capacitor.isNativePlatform()) return;
+    const handle = CapacitorApp.addListener('backButton', () => {
+      setSelectedCardIds([]);
+      setConfirmBulkDelete(false);
+    });
+    return () => {
+      handle.then((h) => h.remove()).catch(() => {});
+    };
+  }, [selectionMode]);
 
   // Thème Clair / Sombre / Système + Options d'accessibilité
   useEffect(() => {
@@ -232,6 +297,8 @@ export function App() {
         }
       }
       setActiveFilter(filter);
+      setSelectedCardIds([]);
+      setConfirmBulkDelete(false);
     },
     [folderMap, settings, unlockedPrivateFolders, canLockDevice]
   );
@@ -239,7 +306,7 @@ export function App() {
   const visibleCards = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
-    return cards.filter((card) => {
+    const filtered = cards.filter((card) => {
       const assignedIds = getCardFolderIds(card);
       const assignedFolders = assignedIds
         .map((id) => folderMap[id])
@@ -268,17 +335,36 @@ export function App() {
       }
       return true;
     });
-  }, [cards, folderMap, activeFilter, searchQuery, unlockedPrivateFolders]);
+
+    const mode = settings.sortMode || 'default';
+    if (mode === 'default') return filtered;
+
+    return [...filtered].sort((a, b) => {
+      if (mode === 'recent') {
+        return (b.lastUsedAt || 0) - (a.lastUsedAt || 0);
+      }
+      if (mode === 'most_used') {
+        return (b.usageCount || 0) - (a.usageCount || 0);
+      }
+      return (a.customName || a.brandName).localeCompare(b.customName || b.brandName, 'fr');
+    });
+  }, [cards, folderMap, activeFilter, searchQuery, unlockedPrivateFolders, settings.sortMode]);
 
   const recentCards = useMemo(() => {
-    if (activeFilter !== 'all' || searchQuery.trim()) return [];
+    if (activeFilter !== 'all' || searchQuery.trim() || selectionMode) return [];
     return visibleCards
       .filter((c) => typeof c.lastUsedAt === 'number' && c.lastUsedAt > 0)
       .sort((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0))
       .slice(0, 3);
-  }, [visibleCards, activeFilter, searchQuery]);
+  }, [visibleCards, activeFilter, searchQuery, selectionMode]);
 
   const greeting = useMemo(() => {
+    if (selectionMode) {
+      return {
+        title: `${selectedCardIds.length} sélectionnée${selectedCardIds.length > 1 ? 's' : ''}`,
+        subtitle: 'Appuyez sur des cartes pour les cocher ou décocher',
+      };
+    }
     if (activeFilter === 'all') {
       return getTimeGreeting();
     }
@@ -294,17 +380,68 @@ export function App() {
       title: folderMap[activeFilter.folderId]?.name || 'Catégorie',
       subtitle: countText,
     };
-  }, [activeFilter, folderMap, visibleCards.length]);
+  }, [activeFilter, folderMap, visibleCards.length, selectionMode, selectedCardIds.length]);
 
-  const handleOpenCardCheckout = async (card: LoyaltyCard) => {
-    await HapticService.tap(settings.hapticFeedback);
-    const updated = await StorageService.incrementCardUsage(card.id);
-    if (updated) {
-      setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      setCheckoutCard(updated);
-    } else {
-      setCheckoutCard(card);
+  const handleOpenCardCheckout = useCallback(
+    async (card: LoyaltyCard) => {
+      await HapticService.tap(settings.hapticFeedback);
+      const updated = await StorageService.incrementCardUsage(card.id);
+      if (updated) {
+        setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        setCheckoutCard(updated);
+      } else {
+        setCheckoutCard(card);
+      }
+    },
+    [settings.hapticFeedback]
+  );
+
+  const handleCloseCheckout = useCallback(() => {
+    setCheckoutCard(null);
+  }, []);
+
+  const handleLongPressCard = useCallback(
+    async (card: LoyaltyCard) => {
+      await HapticService.tap(settings.hapticFeedback);
+      setConfirmBulkDelete(false);
+      setSelectedCardIds((prev) => (prev.includes(card.id) ? prev : [...prev, card.id]));
+    },
+    [settings.hapticFeedback]
+  );
+
+  const handleToggleCardSelection = useCallback((card: LoyaltyCard) => {
+    setConfirmBulkDelete(false);
+    setSelectedCardIds((prev) =>
+      prev.includes(card.id) ? prev.filter((id) => id !== card.id) : [...prev, card.id]
+    );
+  }, []);
+
+  const handleSelectAllVisible = () => {
+    setConfirmBulkDelete(false);
+    const visibleIds = visibleCards.map((c) => c.id);
+    const allSelected = visibleIds.every((id) => selectedCardIds.includes(id));
+    setSelectedCardIds(allSelected ? [] : visibleIds);
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirmBulkDelete) {
+      setConfirmBulkDelete(true);
+      return;
     }
+    await StorageService.bulkDeleteCards(selectedCardIds);
+    await HapticService.tap(settings.hapticFeedback);
+    const refreshed = await StorageService.getCards();
+    setCards(refreshed);
+    setSelectedCardIds([]);
+    setConfirmBulkDelete(false);
+  };
+
+  const handleBulkApplyFolders = async (addIds: string[], removeIds: string[]) => {
+    await StorageService.bulkUpdateCardsFolders(selectedCardIds, addIds, removeIds);
+    await HapticService.success(settings.hapticFeedback);
+    const refreshed = await StorageService.getCards();
+    setCards(refreshed);
+    setSelectedCardIds([]);
   };
 
   const handleSaveCard = async (card: LoyaltyCard) => {
@@ -317,27 +454,31 @@ export function App() {
     }
   };
 
-  const handleDeleteCard = async (cardId: string) => {
-    await StorageService.deleteCard(cardId);
-    await HapticService.tap(settings.hapticFeedback);
-    setCards((prev) => prev.filter((c) => c.id !== cardId));
-    setCheckoutCard(null);
-  };
+  const handleDeleteCard = useCallback(
+    async (cardId: string) => {
+      await StorageService.deleteCard(cardId);
+      await HapticService.tap(settings.hapticFeedback);
+      setCards((prev) => prev.filter((c) => c.id !== cardId));
+      setCheckoutCard(null);
+    },
+    [settings.hapticFeedback]
+  );
 
-  const handleToggleFavorite = async (card: LoyaltyCard, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    await HapticService.tap(settings.hapticFeedback);
-    const updated: LoyaltyCard = {
-      ...card,
-      isFavorite: !card.isFavorite,
-      updatedAt: Date.now(),
-    };
-    await StorageService.saveCard(updated);
-    setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    if (checkoutCard?.id === updated.id) {
-      setCheckoutCard(updated);
-    }
-  };
+  const handleToggleFavorite = useCallback(
+    async (card: LoyaltyCard, e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      await HapticService.tap(settings.hapticFeedback);
+      const updated: LoyaltyCard = {
+        ...card,
+        isFavorite: !card.isFavorite,
+        updatedAt: Date.now(),
+      };
+      await StorageService.saveCard(updated);
+      setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      setCheckoutCard((cur) => (cur?.id === updated.id ? updated : cur));
+    },
+    [settings.hapticFeedback]
+  );
 
   const handleToggleWidgetPin = async (card: LoyaltyCard) => {
     await HapticService.tap(settings.hapticFeedback);
@@ -397,6 +538,12 @@ export function App() {
     await StorageService.saveSettings(next);
   };
 
+  const handleCycleSortMode = async () => {
+    const current = settings.sortMode || 'default';
+    const nextIdx = (SORT_ORDER.indexOf(current) + 1) % SORT_ORDER.length;
+    await handleUpdateSettings({ ...settings, sortMode: SORT_ORDER[nextIdx] });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F7F8FA] dark:bg-[#0D0E12] text-slate-900 dark:text-white flex items-center justify-center">
@@ -411,7 +558,7 @@ export function App() {
     <div
       className="relative min-h-screen bg-[#F7F8FA] dark:bg-[#0D0E12] text-slate-900 dark:text-slate-50 flex flex-col transition-colors duration-200"
       onPointerDown={(e) => {
-        edgeSwipeStartX.current = e.clientX <= 28 && !drawerOpen ? e.clientX : null;
+        edgeSwipeStartX.current = e.clientX <= 28 && !drawerOpen && !selectionMode ? e.clientX : null;
       }}
       onPointerMove={(e) => {
         if (edgeSwipeStartX.current !== null && e.clientX - edgeSwipeStartX.current > 45) {
@@ -423,22 +570,17 @@ export function App() {
         edgeSwipeStartX.current = null;
       }}
     >
-      {/* Halo ambiant discret en haut pour habiller l'écran */}
+      {/* Halo ambiant discret */}
       {!settings.highContrast && (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 top-0 h-56 bg-gradient-to-b from-blue-500/[0.06] via-indigo-500/[0.02] to-transparent dark:from-blue-500/[0.09] dark:via-indigo-500/[0.03]"
+          className="pointer-events-none fixed inset-x-0 top-0 h-52 bg-gradient-to-b from-blue-500/[0.06] via-indigo-500/[0.02] to-transparent dark:from-blue-500/[0.09] dark:via-indigo-500/[0.03]"
         />
       )}
 
-      {/* En-tête épuré : Salutation chaleureuse + compteur discret */}
+      {/* En-tête épuré */}
       <header className="relative z-10 max-w-3xl w-full mx-auto px-5 pt-4 pb-3 safe-top">
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28 }}
-          className="flex items-start justify-between gap-3"
-        >
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight truncate">
               {greeting.title}
@@ -449,57 +591,62 @@ export function App() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0 pt-1">
-            {activeFilter !== 'all' && (
+            {selectionMode ? (
               <button
                 type="button"
-                onClick={() => handleSelectFilter('all')}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white dark:bg-[#16181F] hc-surface border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm active:scale-95 transition-transform"
+                onClick={handleSelectAllVisible}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600 text-white text-xs font-bold shadow-sm active:scale-95 transition-transform"
               >
-                <X className="w-3.5 h-3.5" strokeWidth={2} />
-                Toutes
+                <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                Tout cocher
               </button>
+            ) : (
+              <>
+                {activeFilter !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectFilter('all')}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white dark:bg-[#16181F] hc-surface border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm active:scale-95 transition-transform"
+                  >
+                    <X className="w-3.5 h-3.5" strokeWidth={2} />
+                    Toutes
+                  </button>
+                )}
+                <span className="px-3 py-1.5 rounded-full bg-white/90 dark:bg-[#16181F]/90 hc-surface border border-slate-200/80 dark:border-slate-800/80 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm">
+                  {visibleCards.length} {visibleCards.length > 1 ? 'cartes' : 'carte'}
+                </span>
+              </>
             )}
-            <span className="px-3 py-1.5 rounded-full bg-white/90 dark:bg-[#16181F]/90 hc-surface border border-slate-200/80 dark:border-slate-800/80 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm">
-              {visibleCards.length} {visibleCards.length > 1 ? 'cartes' : 'carte'}
-            </span>
           </div>
-        </motion.div>
+        </div>
       </header>
 
       {/* Portefeuille */}
-      <main className="relative z-10 flex-1 max-w-3xl w-full mx-auto px-5 pt-2 pb-28 space-y-6">
+      <main className="relative z-10 flex-1 max-w-3xl w-full mx-auto px-5 pt-2 pb-28 space-y-5">
         {/* Section Récemment ouvertes */}
         <AnimatePresence>
           {recentCards.length > 0 && (
             <motion.section
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25 }}
-              className="space-y-2.5"
+              transition={{ duration: 0.2 }}
+              className="space-y-2"
             >
               <div className="flex items-center gap-2 px-0.5">
-                <Clock
-                  className="w-3.5 h-3.5 text-slate-400 hc-muted"
-                  strokeWidth={2}
-                />
+                <Clock className="w-3.5 h-3.5 text-slate-400 hc-muted" strokeWidth={2} />
                 <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 hc-muted">
                   Récemment ouvertes
                 </h2>
               </div>
 
               <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
-                {recentCards.map((card, idx) => (
-                  <motion.button
+                {recentCards.map((card) => (
+                  <button
                     key={`recent-${card.id}`}
                     type="button"
-                    initial={{ opacity: 0, scale: 0.94 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: idx * 0.04, type: 'spring', stiffness: 360, damping: 26 }}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.96 }}
                     onClick={() => handleOpenCardCheckout(card)}
-                    className="flex-1 min-w-[125px] p-3 rounded-2xl bg-white dark:bg-[#16181F] hc-surface border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center gap-2.5 text-left transition-shadow hover:shadow-md"
+                    className="flex-1 min-w-[120px] p-3 rounded-2xl bg-white dark:bg-[#16181F] hc-surface border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center gap-2.5 text-left transition-transform duration-150 active:scale-[0.97]"
                   >
                     <BrandLogo brandName={card.brandName} domain={card.domain} size="sm" />
                     <div className="min-w-0 flex-1">
@@ -511,7 +658,7 @@ export function App() {
                         style={{ backgroundColor: card.primaryColor }}
                       />
                     </div>
-                  </motion.button>
+                  </button>
                 ))}
               </div>
             </motion.section>
@@ -521,12 +668,11 @@ export function App() {
         {/* Liste / Grille principale */}
         {visibleCards.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0, y: 12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22 }}
             className="mt-6 p-8 rounded-3xl bg-white dark:bg-[#16181F] hc-surface border border-slate-200/80 dark:border-slate-800/80 text-center shadow-sm"
           >
-            {/* Illustration vectorielle épurée de pile de cartes */}
             <div className="relative w-24 h-16 mx-auto mb-5" aria-hidden="true">
               <div className="absolute inset-x-3 top-0 h-11 rounded-xl bg-blue-500/15 dark:bg-blue-400/20 -rotate-6 border border-blue-500/20" />
               <div className="absolute inset-x-1 top-2 h-12 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md flex items-center justify-center">
@@ -543,214 +689,295 @@ export function App() {
                 : 'Ajoutez votre première carte de fidélité pour l’avoir toujours sous la main en caisse.'}
             </p>
             {!searchQuery && (
-              <motion.button
-                whileTap={{ scale: 0.96 }}
+              <button
                 type="button"
                 onClick={() => {
                   setEditingCard(null);
                   setAddModalOpen(true);
                 }}
-                className="mt-6 inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm shadow-sm"
+                className="mt-6 inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm shadow-sm active:scale-95 transition-transform"
               >
                 <Plus className="w-4 h-4" strokeWidth={2.2} />
                 Ajouter une carte
-              </motion.button>
+              </button>
             )}
           </motion.div>
         ) : (
           <section className="space-y-3">
-            {recentCards.length > 0 && (
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 hc-muted px-0.5">
-                Toutes vos cartes
+            <div className="flex items-center justify-between gap-2 px-0.5">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 hc-muted">
+                {recentCards.length > 0 ? 'Toutes vos cartes' : 'Vos cartes'}
+                {!selectionMode && (
+                  <span className="ml-2 font-medium normal-case opacity-75">
+                    · Appui long pour sélectionner
+                  </span>
+                )}
               </h2>
-            )}
-            <LayoutGroup>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <AnimatePresence mode="popLayout">
-                  {visibleCards.map((card, index) => {
-                    const folderNames = getCardFolderIds(card)
-                      .map((id) => folderMap[id]?.name)
-                      .filter((n): n is string => Boolean(n));
-                    return (
-                      <LoyaltyCardItem
-                        key={card.id}
-                        card={card}
-                        folderNames={folderNames}
-                        index={index}
-                        highContrast={settings.highContrast}
-                        largeText={settings.largeText}
-                        onOpen={handleOpenCardCheckout}
-                        onToggleFavorite={handleToggleFavorite}
-                      />
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-            </LayoutGroup>
+
+              {visibleCards.length >= 2 && !selectionMode && (
+                <button
+                  type="button"
+                  onClick={handleCycleSortMode}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#16181F] hc-surface border border-slate-200/80 dark:border-slate-800/80 text-[11px] font-semibold text-slate-600 dark:text-slate-300 active:scale-95 transition-transform"
+                >
+                  <ArrowUpDown className="w-3 h-3" strokeWidth={2} />
+                  Tri : {SORT_LABELS[settings.sortMode || 'default']}
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {visibleCards.map((card, index) => {
+                const folderNames = getCardFolderIds(card)
+                  .map((id) => folderMap[id]?.name)
+                  .filter((n): n is string => Boolean(n));
+                return (
+                  <LoyaltyCardItem
+                    key={card.id}
+                    card={card}
+                    folderNames={folderNames}
+                    index={index}
+                    highContrast={settings.highContrast}
+                    largeText={settings.largeText}
+                    selectionMode={selectionMode}
+                    isSelected={selectedCardIds.includes(card.id)}
+                    onOpen={handleOpenCardCheckout}
+                    onLongPress={handleLongPressCard}
+                    onToggleSelect={handleToggleCardSelection}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                );
+              })}
+            </div>
           </section>
         )}
       </main>
 
-      {/* Barre inférieure ergonomique pleine largeur (Menu + Recherche + Ajouter) */}
-      <div className="fixed bottom-0 inset-x-0 z-30 bg-white/92 dark:bg-[#12141A]/92 hc-surface backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/80 shadow-sheet safe-bottom">
-        <div className="max-w-3xl mx-auto px-3.5 pt-2.5 pb-1 flex items-center gap-2">
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            type="button"
-            onClick={() => {
-              HapticService.tap(settings.hapticFeedback);
-              setDrawerOpen(true);
-            }}
-            className="w-12 h-12 rounded-2xl bg-[#F7F8FA] dark:bg-[#1B1E27] border border-slate-200/80 dark:border-slate-800 flex items-center justify-center text-slate-800 dark:text-slate-100 shrink-0"
-            aria-label="Ouvrir le menu et les catégories"
-          >
-            <Menu className="w-5 h-5" strokeWidth={1.9} />
-          </motion.button>
+      {/* Barre inférieure pleine largeur : bascule entre Navigation et Actions Sélection Multi-Cartes */}
+      <div className="fixed bottom-0 inset-x-0 z-30 bg-white/95 dark:bg-[#12141A]/95 hc-surface backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 shadow-sheet safe-bottom">
+        {selectionMode ? (
+          <div className="max-w-3xl mx-auto px-3.5 pt-2.5 pb-1 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCardIds([]);
+                setConfirmBulkDelete(false);
+              }}
+              className="h-12 px-3.5 rounded-2xl bg-[#F7F8FA] dark:bg-[#1B1E27] border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
+            >
+              <X className="w-4 h-4" strokeWidth={2} />
+              Annuler
+            </button>
 
-          <div className="relative flex-1 min-w-0">
-            <Search
-              className="w-4 h-4 text-slate-400 hc-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-              strokeWidth={1.9}
-            />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher..."
-              className="w-full h-12 pl-10 pr-9 rounded-2xl bg-[#F7F8FA] dark:bg-[#1B1E27] border border-slate-200/80 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="w-7 h-7 rounded-full bg-slate-200/80 dark:bg-slate-700 flex items-center justify-center absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 dark:text-slate-200"
-                aria-label="Effacer la recherche"
-              >
-                <X className="w-3.5 h-3.5" strokeWidth={2} />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setBulkCategoryOpen(true)}
+              className="flex-1 h-12 px-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+            >
+              <FolderPlus className="w-4 h-4" strokeWidth={2} />
+              Catégories
+            </button>
+
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              className={`h-12 px-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 shrink-0 active:scale-95 transition-colors ${
+                confirmBulkDelete
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+              }`}
+            >
+              <Trash2 className="w-4 h-4" strokeWidth={2} />
+              {confirmBulkDelete
+                ? `Confirmer (${selectedCardIds.length})`
+                : `Supprimer (${selectedCardIds.length})`}
+            </button>
           </div>
+        ) : (
+          <div className="max-w-3xl mx-auto px-3.5 pt-2.5 pb-1 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                HapticService.tap(settings.hapticFeedback);
+                setDrawerOpen(true);
+              }}
+              className="w-12 h-12 rounded-2xl bg-[#F7F8FA] dark:bg-[#1B1E27] border border-slate-200/80 dark:border-slate-800 flex items-center justify-center text-slate-800 dark:text-slate-100 shrink-0 active:scale-95 transition-transform"
+              aria-label="Ouvrir le menu et les catégories"
+            >
+              <Menu className="w-5 h-5" strokeWidth={1.9} />
+            </button>
 
-          <motion.button
-            whileTap={{ scale: 0.94 }}
-            type="button"
-            onClick={() => {
-              HapticService.tap(settings.hapticFeedback);
-              setEditingCard(null);
-              setAddModalOpen(true);
-            }}
-            className="h-12 px-4 sm:px-5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm shadow-sm flex items-center justify-center gap-1.5 shrink-0"
-          >
-            <Plus className="w-4 h-4" strokeWidth={2.25} />
-            <span>Ajouter</span>
-          </motion.button>
-        </div>
+            <div className="relative flex-1 min-w-0">
+              <Search
+                className="w-4 h-4 text-slate-400 hc-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                strokeWidth={1.9}
+              />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher..."
+                className="w-full h-12 pl-10 pr-9 rounded-2xl bg-[#F7F8FA] dark:bg-[#1B1E27] border border-slate-200/80 dark:border-slate-800 text-sm font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="w-7 h-7 rounded-full bg-slate-200/80 dark:bg-slate-700 flex items-center justify-center absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 dark:text-slate-200"
+                  aria-label="Effacer la recherche"
+                >
+                  <X className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                HapticService.tap(settings.hapticFeedback);
+                setEditingCard(null);
+                setAddModalOpen(true);
+              }}
+              className="h-12 px-4 sm:px-5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm shadow-sm flex items-center justify-center gap-1.5 shrink-0 active:scale-95 transition-transform"
+            >
+              <Plus className="w-4 h-4" strokeWidth={2.25} />
+              <span>Ajouter</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tiroir de navigation gauche */}
-      <NavigationDrawer
-        isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        folders={folders}
-        activeFilter={activeFilter}
-        onSelectFilter={handleSelectFilter}
-        totalCardsCount={cards.length}
-        favoritesCount={favoritesCount}
-        cardCountsByFolder={cardCountsByFolder}
-        onSaveFolder={handleSaveFolder}
-        onReorderFolders={handleReorderFolders}
-        onDeleteFolder={handleDeleteFolder}
-        onOpenSettings={() => setSettingsModalOpen(true)}
-      />
+      <Suspense fallback={null}>
+        <NavigationDrawer
+          isOpen={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          folders={folders}
+          activeFilter={activeFilter}
+          onSelectFilter={handleSelectFilter}
+          totalCardsCount={cards.length}
+          favoritesCount={favoritesCount}
+          cardCountsByFolder={cardCountsByFolder}
+          onSaveFolder={handleSaveFolder}
+          onReorderFolders={handleReorderFolders}
+          onDeleteFolder={handleDeleteFolder}
+          onOpenSettings={() => setSettingsModalOpen(true)}
+        />
+      </Suspense>
 
       {/* Mode Caisse */}
-      <AnimatePresence>
-        {checkoutCard && (
-          <CardCheckoutModal
-            card={checkoutCard}
-            folders={getCardFolderIds(checkoutCard)
-              .map((id) => folderMap[id])
-              .filter((f): f is CardFolder => Boolean(f))}
-            settings={settings}
-            onClose={() => setCheckoutCard(null)}
-            onEdit={(card) => {
-              setCheckoutCard(null);
-              setEditingCard(card);
-              setAddModalOpen(true);
-            }}
-            onDelete={handleDeleteCard}
-            onToggleFavorite={(card) => handleToggleFavorite(card)}
-          />
-        )}
-      </AnimatePresence>
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {checkoutCard && (
+            <CardCheckoutModal
+              card={checkoutCard}
+              folders={getCardFolderIds(checkoutCard)
+                .map((id) => folderMap[id])
+                .filter((f): f is CardFolder => Boolean(f))}
+              settings={settings}
+              onClose={handleCloseCheckout}
+              onEdit={(card) => {
+                setCheckoutCard(null);
+                setEditingCard(card);
+                setAddModalOpen(true);
+              }}
+              onDelete={handleDeleteCard}
+              onToggleFavorite={(card) => handleToggleFavorite(card)}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
 
       {/* Ajout / Édition de carte */}
-      <AnimatePresence>
-        {addModalOpen && (
-          <AddCardModal
-            folders={folders}
-            editingCard={editingCard}
-            defaultFolderId={
-              typeof activeFilter === 'object' && activeFilter.type === 'folder'
-                ? activeFilter.folderId
-                : undefined
-            }
-            onSave={handleSaveCard}
-            onCreateFolder={handleSaveFolder}
-            onClose={() => {
-              setAddModalOpen(false);
-              setEditingCard(null);
-            }}
-          />
-        )}
-      </AnimatePresence>
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {addModalOpen && (
+            <AddCardModal
+              folders={folders}
+              editingCard={editingCard}
+              defaultFolderId={
+                typeof activeFilter === 'object' && activeFilter.type === 'folder'
+                  ? activeFilter.folderId
+                  : undefined
+              }
+              onSave={handleSaveCard}
+              onCreateFolder={handleSaveFolder}
+              onClose={() => {
+                setAddModalOpen(false);
+                setEditingCard(null);
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
 
-      {/* Paramètres (Thème, Accessibilité, Sécurité, Widgets, Sauvegarde) */}
-      <AnimatePresence>
-        {settingsModalOpen && (
-          <SettingsModal
-            settings={settings}
-            cards={cards}
-            onUpdateSettings={handleUpdateSettings}
-            onToggleWidgetPin={handleToggleWidgetPin}
-            onSetMainWidgetCard={handleSetMainWidgetCard}
-            onDataImported={async () => {
-              await reloadDatabase();
-            }}
-            onClose={() => setSettingsModalOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Catégories en lot (Mode Sélection) */}
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {bulkCategoryOpen && selectionMode && (
+            <BulkCategoryModal
+              selectedCards={cards.filter((c) => selectedCardIds.includes(c.id))}
+              folders={folders}
+              onApply={handleBulkApplyFolders}
+              onCreateFolder={handleSaveFolder}
+              onClose={() => setBulkCategoryOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
+
+      {/* Paramètres */}
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {settingsModalOpen && (
+            <SettingsModal
+              settings={settings}
+              cards={cards}
+              onUpdateSettings={handleUpdateSettings}
+              onToggleWidgetPin={handleToggleWidgetPin}
+              onSetMainWidgetCard={handleSetMainWidgetCard}
+              onDataImported={async () => {
+                await reloadDatabase();
+              }}
+              onClose={() => setSettingsModalOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
 
       {/* Écran de verrouillage global */}
-      <AnimatePresence>
-        {appLocked && (
-          <SecurityLockModal
-            mode="unlock-app"
-            settings={settings}
-            onUnlock={() => setAppLocked(false)}
-          />
-        )}
-      </AnimatePresence>
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {appLocked && (
+            <SecurityLockModal
+              mode="unlock-app"
+              settings={settings}
+              onUnlock={() => setAppLocked(false)}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
 
       {/* Verrouillage dossier privé */}
-      <AnimatePresence>
-        {pendingPrivateFolderId && (
-          <SecurityLockModal
-            mode="unlock-private"
-            settings={settings}
-            onCancel={() => setPendingPrivateFolderId(null)}
-            onUnlock={() => {
-              setUnlockedPrivateFolders((prev) => ({
-                ...prev,
-                [pendingPrivateFolderId]: true,
-              }));
-              setActiveFilter({ type: 'folder', folderId: pendingPrivateFolderId });
-              setPendingPrivateFolderId(null);
-            }}
-          />
-        )}
-      </AnimatePresence>
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {pendingPrivateFolderId && (
+            <SecurityLockModal
+              mode="unlock-private"
+              settings={settings}
+              onCancel={() => setPendingPrivateFolderId(null)}
+              onUnlock={() => {
+                setUnlockedPrivateFolders((prev) => ({
+                  ...prev,
+                  [pendingPrivateFolderId]: true,
+                }));
+                setActiveFilter({ type: 'folder', folderId: pendingPrivateFolderId });
+                setPendingPrivateFolderId(null);
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
     </div>
   );
 }

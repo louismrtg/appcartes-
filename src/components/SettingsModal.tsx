@@ -5,10 +5,14 @@ import {
   CheckCircle2,
   Contrast,
   Download,
+  ExternalLink,
   Fingerprint,
   KeyRound,
+  Loader2,
   Lock,
+  Maximize2,
   Moon,
+  RefreshCw,
   RotateCw,
   Shield,
   Smartphone,
@@ -16,11 +20,14 @@ import {
   Sun,
   Type,
   Upload,
+  Vibrate,
   X,
   Zap,
 } from 'lucide-react';
 import {
+  APP_VERSION,
   AppSettings,
+  GITHUB_REPO,
   LockScope,
   LoyaltyCard,
   ThemePreference,
@@ -53,7 +60,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [biometryAvailable, setBiometryAvailable] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<{
+    message: string;
+    downloadUrl?: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateStatus(null);
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+        { headers: { Accept: 'application/vnd.github+json' } }
+      );
+      if (!response.ok) {
+        setUpdateStatus({
+          message:
+            'Accès direct indisponible (dépôt privé ou hors-ligne). Ouvrez la page GitHub Releases pour installer la dernière version.',
+          downloadUrl: `https://github.com/${GITHUB_REPO}/releases`,
+        });
+        return;
+      }
+      const data = (await response.json()) as {
+        tag_name?: string;
+        html_url?: string;
+        assets?: Array<{ name: string; browser_download_url: string }>;
+      };
+      const apkAsset = data.assets?.find((a) => a.name.toLowerCase().endsWith('.apk'));
+      const latestTag = data.tag_name || 'Dernière build';
+      setUpdateStatus({
+        message: `Dernière build détectée : ${latestTag}. Téléchargez l’APK ci-dessous pour mettre à jour en conservant vos cartes.`,
+        downloadUrl:
+          apkAsset?.browser_download_url ||
+          data.html_url ||
+          `https://github.com/${GITHUB_REPO}/releases`,
+      });
+    } catch {
+      setUpdateStatus({
+        message:
+          'Impossible de joindre GitHub pour le moment. Vérifiez votre connexion ou ouvrez GitHub Releases.',
+        downloadUrl: `https://github.com/${GITHUB_REPO}/releases`,
+      });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   useEffect(() => {
     BiometricService.checkAvailability().then((info) => {
@@ -225,20 +278,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </section>
 
-          {/* Mode Caisse */}
+          {/* Mode Caisse & Orientation */}
           <section className="space-y-2.5">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-              Mode Caisse
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 hc-muted px-1">
+              Mode Caisse &amp; Orientation
             </h3>
-            <div className="rounded-2xl bg-white dark:bg-[#16181F] border border-slate-200/80 dark:border-slate-800/80 divide-y divide-slate-200/70 dark:divide-slate-800/70">
+            <div className="rounded-2xl bg-white dark:bg-[#16181F] hc-surface border border-slate-200/80 dark:border-slate-800/80 divide-y divide-slate-200/70 dark:divide-slate-800/70">
               <label className="flex items-center justify-between p-4 cursor-pointer">
                 <span className="flex items-center gap-3 pr-3">
-                  <Sun className="w-4 h-4 text-slate-500 shrink-0" strokeWidth={1.75} />
+                  <Sun className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
                   <span>
                     <span className="block font-semibold text-sm text-slate-900 dark:text-white">
                       Luminosité à 100 % automatique
                     </span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
                       Restaure le niveau d’origine à la fermeture
                     </span>
                   </span>
@@ -247,18 +300,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="checkbox"
                   checked={settings.autoMaxBrightness}
                   onChange={(e) => toggleSetting('autoMaxBrightness', e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
+                  className="w-5 h-5 accent-blue-600 shrink-0"
                 />
               </label>
 
               <label className="flex items-center justify-between p-4 cursor-pointer">
                 <span className="flex items-center gap-3 pr-3">
-                  <RotateCw className="w-4 h-4 text-slate-500 shrink-0" strokeWidth={1.75} />
+                  <RotateCw className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
                   <span>
                     <span className="block font-semibold text-sm text-slate-900 dark:text-white">
                       Basculer en Paysage à l’ouverture
                     </span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
                       Élargit le code-barres pour la douchette laser
                     </span>
                   </span>
@@ -267,18 +320,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="checkbox"
                   checked={settings.autoLandscape}
                   onChange={(e) => toggleSetting('autoLandscape', e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
+                  className="w-5 h-5 accent-blue-600 shrink-0"
                 />
               </label>
 
               <label className="flex items-center justify-between p-4 cursor-pointer">
                 <span className="flex items-center gap-3 pr-3">
-                  <Zap className="w-4 h-4 text-slate-500 shrink-0" strokeWidth={1.75} />
+                  <Maximize2 className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
+                  <span>
+                    <span className="block font-semibold text-sm text-slate-900 dark:text-white">
+                      Forcer le Paysage plein écran (code-barres)
+                    </span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
+                      Bloque en horizontal sans retour portrait et étend le code-barres
+                    </span>
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.forceLandscapeCheckout}
+                  onChange={(e) => toggleSetting('forceLandscapeCheckout', e.target.checked)}
+                  className="w-5 h-5 accent-blue-600 shrink-0"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-4 cursor-pointer">
+                <span className="flex items-center gap-3 pr-3">
+                  <Smartphone className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
+                  <span>
+                    <span className="block font-semibold text-sm text-slate-900 dark:text-white">
+                      Bloquer toute l’application en Paysage
+                    </span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
+                      Maintient tout le portefeuille à l’horizontale
+                    </span>
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.lockAppLandscape}
+                  onChange={(e) => toggleSetting('lockAppLandscape', e.target.checked)}
+                  className="w-5 h-5 accent-blue-600 shrink-0"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-4 cursor-pointer">
+                <span className="flex items-center gap-3 pr-3">
+                  <Zap className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
                   <span>
                     <span className="block font-semibold text-sm text-slate-900 dark:text-white">
                       Empêcher la mise en veille
                     </span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
                       Garde l’écran allumé pendant le passage en caisse
                     </span>
                   </span>
@@ -287,7 +380,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="checkbox"
                   checked={settings.keepAwake}
                   onChange={(e) => toggleSetting('keepAwake', e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
+                  className="w-5 h-5 accent-blue-600 shrink-0"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-4 cursor-pointer">
+                <span className="flex items-center gap-3 pr-3">
+                  <Vibrate className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
+                  <span>
+                    <span className="block font-semibold text-sm text-slate-900 dark:text-white">
+                      Retour tactile doux (vibrations)
+                    </span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
+                      Désactivé par défaut · micro-impulsion très discrète
+                    </span>
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.hapticFeedback}
+                  onChange={(e) => toggleSetting('hapticFeedback', e.target.checked)}
+                  className="w-5 h-5 accent-blue-600 shrink-0"
                 />
               </label>
             </div>
@@ -518,8 +631,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </section>
 
+          {/* Mises à jour APK via GitHub */}
+          <section className="space-y-2.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 hc-muted px-1">
+              Mises à jour de l’application
+            </h3>
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#16181F] hc-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="font-semibold text-sm text-slate-900 dark:text-white">
+                    Version installée : v{APP_VERSION}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 hc-muted">
+                    Les nouvelles versions APK conservent toutes vos cartes locales
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={checkingUpdate}
+                  onClick={handleCheckUpdate}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+                >
+                  {checkingUpdate ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={2} />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" strokeWidth={2} />
+                  )}
+                  Vérifier
+                </button>
+              </div>
+
+              {updateStatus && (
+                <div className="p-3 rounded-xl bg-[#F7F8FA] dark:bg-[#0D0E12] border border-slate-200/80 dark:border-slate-800 space-y-2">
+                  <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
+                    {updateStatus.message}
+                  </p>
+                  {updateStatus.downloadUrl && (
+                    <a
+                      href={updateStatus.downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+                      Télécharger / Ouvrir GitHub Releases
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+
           <p className="text-center text-xs font-medium text-slate-400 dark:text-slate-500 hc-muted pb-2">
-            Mes Cartes · © Louis Martignon (@louismrtg)
+            Mes Cartes · v{APP_VERSION} · © Louis Martignon (@louismrtg)
           </p>
         </div>
       </motion.div>

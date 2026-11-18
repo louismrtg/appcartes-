@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -7,6 +7,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Lock,
   Pencil,
   RotateCw,
   Star,
@@ -41,18 +42,28 @@ export const CardCheckoutModal: React.FC<CardCheckoutModalProps> = ({
   onDelete,
   onToggleFavorite,
 }) => {
+  const shouldForceLandscape =
+    settings.forceLandscapeCheckout || settings.autoLandscape || settings.lockAppLandscape;
+
   const [brightnessActive, setBrightnessActive] = useState(false);
   const [wakeLocked, setWakeLocked] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(settings.autoLandscape);
+  const [isLandscape, setIsLandscape] = useState(shouldForceLandscape);
   const [copied, setCopied] = useState(false);
   const [showNote, setShowNote] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Refs stables pour éviter qu'un clic sur Favori/Copier ne redéclenche l'effet matériel
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const keepAppLandscapeRef = useRef(settings.lockAppLandscape);
+  keepAppLandscapeRef.current = settings.lockAppLandscape;
+
   const handleClose = useCallback(async () => {
     await BrightnessService.restore();
-    await OrientationService.restorePortrait();
-    onClose();
-  }, [onClose]);
+    await OrientationService.restorePortrait(keepAppLandscapeRef.current);
+    onCloseRef.current();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -68,7 +79,7 @@ export const CardCheckoutModal: React.FC<CardCheckoutModalProps> = ({
         setWakeLocked(result.wakeLocked);
       }
 
-      if (settings.autoLandscape) {
+      if (shouldForceLandscape) {
         await OrientationService.lockLandscape();
       }
     };
@@ -96,14 +107,18 @@ export const CardCheckoutModal: React.FC<CardCheckoutModalProps> = ({
         backListenerPromise.then((h) => h.remove()).catch(() => {});
       }
       BrightnessService.restore();
-      OrientationService.restorePortrait();
+      OrientationService.restorePortrait(keepAppLandscapeRef.current);
     };
-  }, [settings.autoLandscape, settings.autoMaxBrightness, settings.keepAwake, handleClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleToggleOrientation = async () => {
+    if (settings.forceLandscapeCheckout || settings.lockAppLandscape) {
+      return;
+    }
     await HapticService.tap(settings.hapticFeedback);
     if (isLandscape) {
-      await OrientationService.restorePortrait();
+      await OrientationService.restorePortrait(false);
       setIsLandscape(false);
     } else {
       await OrientationService.lockLandscape();
@@ -122,110 +137,119 @@ export const CardCheckoutModal: React.FC<CardCheckoutModalProps> = ({
     }
   };
 
+  const lockedLandscapeStrict = settings.forceLandscapeCheckout || settings.lockAppLandscape;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex flex-col justify-between overflow-y-auto safe-top safe-bottom"
+      transition={{ duration: 0.16 }}
+      className="fixed inset-0 z-50 flex flex-col justify-between overflow-hidden safe-top safe-bottom"
       style={{
         background: `linear-gradient(155deg, ${card.primaryColor} 0%, ${card.secondaryColor} 100%)`,
       }}
     >
-      {/* En-tête sobre : Logo officiel + Nom + Bouton fermer */}
-      <header className="px-5 pt-3 pb-2 flex items-center justify-between gap-3 text-white">
-        <div className="flex items-center gap-3 min-w-0">
-          <BrandLogo brandName={card.brandName} domain={card.domain} size="md" />
+      {/* En-tête compact pleine largeur */}
+      <header className="px-4 sm:px-6 pt-2 pb-1.5 flex items-center justify-between gap-3 text-white shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <BrandLogo brandName={card.brandName} domain={card.domain} size="sm" />
           <div className="min-w-0">
-            <h2 className="text-xl font-bold tracking-tight truncate leading-tight">
+            <h2 className="text-base sm:text-xl font-bold tracking-tight truncate leading-tight">
               {card.customName || card.brandName}
             </h2>
-            <p className="text-xs font-medium opacity-85 truncate">
+            <p className="text-[11px] sm:text-xs font-medium opacity-85 truncate">
               {card.brandName}
               {folders.length > 0 ? ` · ${folders.map((f) => f.name).join(' · ')}` : ''}
             </p>
           </div>
         </div>
 
-        <button
-          onClick={handleClose}
-          className="w-11 h-11 rounded-full bg-black/20 hover:bg-black/35 text-white flex items-center justify-center backdrop-blur-md transition-colors shrink-0"
-          aria-label="Fermer la carte"
-        >
-          <X className="w-5 h-5" strokeWidth={1.75} />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-white/90 mr-1">
+            {brightnessActive && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/25">
+                <Sun className="w-3 h-3" strokeWidth={1.75} />
+                100 %
+              </span>
+            )}
+            {wakeLocked && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/25">
+                <Zap className="w-3 h-3" strokeWidth={1.75} />
+                Actif
+              </span>
+            )}
+          </div>
+
+          {lockedLandscapeStrict ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-black/25 text-[11px] font-semibold text-white">
+              <Lock className="w-3 h-3" strokeWidth={2} />
+              Paysage
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleToggleOrientation}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-black/25 hover:bg-black/35 text-[11px] font-semibold text-white transition-colors"
+            >
+              <RotateCw className="w-3 h-3" strokeWidth={2} />
+              {isLandscape ? 'Paysage' : 'Portrait'}
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleClose}
+            className="w-10 h-10 rounded-full bg-black/25 hover:bg-black/40 text-white flex items-center justify-center transition-colors shrink-0"
+            aria-label="Fermer la carte"
+          >
+            <X className="w-5 h-5" strokeWidth={2} />
+          </button>
+        </div>
       </header>
 
-      {/* Indicateurs discrets d'état matériel */}
-      <div className="px-5 flex flex-wrap items-center justify-center gap-2 text-[11px] font-semibold text-white/90">
-        {brightnessActive && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/20 backdrop-blur-sm">
-            <Sun className="w-3.5 h-3.5" strokeWidth={1.75} />
-            Luminosité 100 %
-          </span>
-        )}
-        {wakeLocked && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/20 backdrop-blur-sm">
-            <Zap className="w-3.5 h-3.5" strokeWidth={1.75} />
-            Écran actif
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={handleToggleOrientation}
-          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/20 hover:bg-black/30 backdrop-blur-sm transition-colors"
-        >
-          <RotateCw className="w-3.5 h-3.5" strokeWidth={1.75} />
-          {isLandscape ? 'Paysage' : 'Portrait'}
-        </button>
-      </div>
-
-      {/* Zone centrale : Code-barres blanc pur haute définition */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-4 max-w-2xl w-full mx-auto">
-        <motion.div
-          layoutId={`wallet-card-${card.id}`}
-          transition={{ type: 'spring', stiffness: 280, damping: 28 }}
-          className="w-full"
-        >
-          <BarcodeRenderer value={card.barcodeValue} format={card.barcodeFormat} size="checkout" />
-        </motion.div>
+      {/* Zone centrale pleine largeur : Code-barres blanc pur sur tout l'écran */}
+      <main className="flex-1 min-h-0 w-full px-3 sm:px-6 py-1.5 flex flex-col justify-center">
+        <div className="w-full flex-1 min-h-0 flex items-center justify-center">
+          <BarcodeRenderer
+            value={card.barcodeValue}
+            format={card.barcodeFormat}
+            size="checkout"
+            fullScreen={true}
+          />
+        </div>
 
         {card.notes && card.notes.trim().length > 0 && (
-          <div className="mt-3 w-full rounded-2xl bg-black/25 backdrop-blur-md p-3.5 text-white">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-white/80">
-                Note personnelle
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowNote((v) => !v)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25"
-              >
-                {showNote ? (
-                  <EyeOff className="w-3.5 h-3.5" strokeWidth={1.75} />
-                ) : (
-                  <Eye className="w-3.5 h-3.5" strokeWidth={1.75} />
-                )}
-                {showNote ? 'Masquer' : 'Afficher'}
-              </button>
-            </div>
-            <p className="mt-1.5 text-sm font-medium leading-relaxed">
-              {showNote ? card.notes : 'Contenu masqué'}
+          <div className="mt-2 w-full rounded-xl bg-black/25 px-3.5 py-2 text-white flex items-center justify-between gap-3 shrink-0">
+            <p className="text-xs sm:text-sm font-medium truncate">
+              {showNote ? card.notes : 'Note personnelle masquée'}
             </p>
+            <button
+              type="button"
+              onClick={() => setShowNote((v) => !v)}
+              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 shrink-0"
+            >
+              {showNote ? (
+                <EyeOff className="w-3.5 h-3.5" strokeWidth={1.75} />
+              ) : (
+                <Eye className="w-3.5 h-3.5" strokeWidth={1.75} />
+              )}
+              {showNote ? 'Masquer' : 'Voir'}
+            </button>
           </div>
         )}
       </main>
 
-      {/* Actions rapides en bas */}
-      <footer className="px-4 pb-4 pt-2 max-w-2xl w-full mx-auto">
+      {/* Actions rapides en bas compactes pleine largeur */}
+      <footer className="px-3 sm:px-6 pb-2 pt-1 w-full shrink-0">
         <div className="grid grid-cols-4 gap-2">
           <button
             type="button"
             onClick={handleCopyNumber}
-            className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-2xl bg-black/20 hover:bg-black/30 text-white text-xs font-semibold backdrop-blur-sm"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-black/25 hover:bg-black/35 text-white text-xs font-semibold transition-colors"
           >
             {copied ? (
-              <Check className="w-4 h-4 text-emerald-300" strokeWidth={1.75} />
+              <Check className="w-4 h-4 text-emerald-300" strokeWidth={2} />
             ) : (
               <Copy className="w-4 h-4" strokeWidth={1.75} />
             )}
@@ -235,7 +259,7 @@ export const CardCheckoutModal: React.FC<CardCheckoutModalProps> = ({
           <button
             type="button"
             onClick={() => onToggleFavorite(card)}
-            className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-2xl bg-black/20 hover:bg-black/30 text-white text-xs font-semibold backdrop-blur-sm"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-black/25 hover:bg-black/35 text-white text-xs font-semibold transition-colors"
           >
             <Star
               strokeWidth={1.75}
@@ -248,10 +272,10 @@ export const CardCheckoutModal: React.FC<CardCheckoutModalProps> = ({
             type="button"
             onClick={() => {
               BrightnessService.restore();
-              OrientationService.restorePortrait();
+              OrientationService.restorePortrait(keepAppLandscapeRef.current);
               onEdit(card);
             }}
-            className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-2xl bg-black/20 hover:bg-black/30 text-white text-xs font-semibold backdrop-blur-sm"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-black/25 hover:bg-black/35 text-white text-xs font-semibold transition-colors"
           >
             <Pencil className="w-4 h-4" strokeWidth={1.75} />
             <span>Modifier</span>
@@ -261,7 +285,7 @@ export const CardCheckoutModal: React.FC<CardCheckoutModalProps> = ({
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-2xl bg-black/20 hover:bg-rose-600/80 text-white text-xs font-semibold backdrop-blur-sm transition-colors"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-black/25 hover:bg-rose-600/80 text-white text-xs font-semibold transition-colors"
             >
               <Trash2 className="w-4 h-4" strokeWidth={1.75} />
               <span>Supprimer</span>
@@ -271,12 +295,12 @@ export const CardCheckoutModal: React.FC<CardCheckoutModalProps> = ({
               type="button"
               onClick={async () => {
                 await BrightnessService.restore();
-                await OrientationService.restorePortrait();
+                await OrientationService.restorePortrait(keepAppLandscapeRef.current);
                 await onDelete(card.id);
               }}
-              className="flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-2xl bg-rose-600 text-white text-xs font-bold"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-rose-600 text-white text-xs font-bold"
             >
-              <Check className="w-4 h-4" strokeWidth={1.75} />
+              <Check className="w-4 h-4" strokeWidth={2} />
               <span>Confirmer</span>
             </button>
           )}

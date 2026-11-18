@@ -9,7 +9,17 @@
     height: 100%;
     font-family: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, sans-serif;
     overscroll-behavior-y: contain;
+    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  [role='button'],
+  a,
+  input,
+  select,
+  label {
+    touch-action: manipulation;
   }
 
   html.accessibility-large {

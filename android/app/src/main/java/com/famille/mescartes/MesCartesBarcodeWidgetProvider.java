@@ -7,7 +7,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Build;
 import android.view.View;
@@ -57,12 +59,14 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
                 String cardId = selected.optString("id", "");
                 String brandName = selected.optString("brandName", "Mes Cartes");
                 String customName = selected.optString("customName", brandName);
+                String colorHex = selected.optString("primaryColor", "#2563EB");
                 String barcodeValue = selected.optString("barcodeValue", "");
                 String formatStr = selected.optString("barcodeFormat", "CODE_128");
 
                 views.setTextViewText(R.id.barcode_widget_title, customName);
                 views.setTextViewText(R.id.barcode_widget_brand, brandName);
                 views.setTextViewText(R.id.barcode_widget_number, barcodeValue);
+                views.setImageViewBitmap(R.id.barcode_widget_accent, drawDotBitmap(colorHex));
 
                 Bitmap bmp = renderBarcodeBitmap(barcodeValue, formatStr);
                 if (bmp != null) {
@@ -87,6 +91,7 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
                 views.setTextViewText(R.id.barcode_widget_title, "Carte Favorite Directe");
                 views.setTextViewText(R.id.barcode_widget_brand, "Mes Cartes");
                 views.setTextViewText(R.id.barcode_widget_number, "Epinglez une carte dans Parametres");
+                views.setImageViewBitmap(R.id.barcode_widget_accent, drawDotBitmap("#2563EB"));
                 views.setViewVisibility(R.id.barcode_widget_image, View.GONE);
                 views.setOnClickPendingIntent(
                     R.id.barcode_widget_root,
@@ -96,6 +101,7 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
         } catch (Exception e) {
             views.setTextViewText(R.id.barcode_widget_title, "Mes Cartes");
             views.setTextViewText(R.id.barcode_widget_number, "Appuyez pour ouvrir");
+            views.setImageViewBitmap(R.id.barcode_widget_accent, drawDotBitmap("#2563EB"));
             views.setViewVisibility(R.id.barcode_widget_image, View.GONE);
             views.setOnClickPendingIntent(
                 R.id.barcode_widget_root,
@@ -106,12 +112,31 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
         appWidgetManager.updateAppWidget(appWidgetId, views);
     }
 
+    private static Bitmap drawDotBitmap(String hex) {
+        int color;
+        try {
+            color = Color.parseColor(hex);
+        } catch (IllegalArgumentException e) {
+            color = Color.parseColor("#2563EB");
+        }
+        Bitmap bmp = Bitmap.createBitmap(42, 42, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setColor(color);
+        canvas.drawCircle(21f, 21f, 18f, p);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(3f);
+        p.setColor(Color.argb(140, 255, 255, 255));
+        canvas.drawCircle(21f, 21f, 18f, p);
+        return bmp;
+    }
+
     private static Bitmap renderBarcodeBitmap(String value, String formatStr) {
         if (value == null || value.trim().isEmpty()) return null;
         BarcodeFormat format = mapFormat(formatStr);
         boolean is2d = format == BarcodeFormat.QR_CODE || format == BarcodeFormat.DATA_MATRIX;
-        int width = is2d ? 280 : 600;
-        int height = is2d ? 280 : 140;
+        int width = is2d ? 360 : 800;
+        int height = is2d ? 360 : 200;
 
         MultiFormatWriter writer = new MultiFormatWriter();
         BitMatrix matrix;
@@ -119,7 +144,7 @@ public class MesCartesBarcodeWidgetProvider extends AppWidgetProvider {
             matrix = writer.encode(value, format, width, height);
         } catch (Exception firstError) {
             try {
-                matrix = writer.encode(value, BarcodeFormat.CODE_128, 600, 140);
+                matrix = writer.encode(value, BarcodeFormat.CODE_128, 800, 200);
             } catch (Exception secondError) {
                 return null;
             }
