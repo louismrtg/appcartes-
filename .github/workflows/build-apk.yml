@@ -46,7 +46,9 @@ jobs:
 
       - name: Lire la version depuis package.json
         id: pkg
-        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Conserver la clé de signature debug entre les builds
         uses: actions/cache@v4

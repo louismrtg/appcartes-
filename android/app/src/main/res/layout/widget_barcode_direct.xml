@@ -38,8 +38,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/widget_pill_btn"
-            android:paddingHorizontal="9dp"
-            android:paddingVertical="3dp"
+            android:paddingLeft="9dp"
+            android:paddingRight="9dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
             android:text="Mes Cartes"
             android:textColor="#E2E8F0"
             android:textSize="10sp"
@@ -53,8 +55,10 @@
         android:background="@drawable/widget_white_box"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="8dp">
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
         <ImageView
             android:id="@+id/barcode_widget_image"
