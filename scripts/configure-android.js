@@ -40,14 +40,45 @@ function removeIfExists(filePath) {
 
 function patchAppBuildGradle() {
   if (!fs.existsSync(APP_BUILD_GRADLE)) return;
-  let gradle = fs.readFileSync(APP_BUILD_GRADLE, 'utf8');
+  const original = fs.readFileSync(APP_BUILD_GRADLE, 'utf8');
+  let gradle = original;
+
+  const pkgPath = path.join(ROOT_DIR, 'package.json');
+  const pkgVersion = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '1.0.0';
+  const [major = 0, minor = 0, patch = 0] = pkgVersion
+    .split('.')
+    .map((n) => Number.parseInt(n, 10) || 0);
+  const versionCode = major * 10000 + minor * 100 + patch;
+
+  gradle = gradle.replace(/versionCode\s+\d+/, `versionCode ${versionCode}`);
+  gradle = gradle.replace(/versionName\s+"[^"]*"/, `versionName "${pkgVersion}"`);
+
+  if (!gradle.includes('signingConfigs')) {
+    const signingBlock = `    signingConfigs {
+        debug {
+            storeFile file(System.getenv("ANDROID_KEYSTORE_PATH") ?: "debug.keystore")
+            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: "android"
+            keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: "androiddebugkey"
+            keyPassword System.getenv("ANDROID_KEY_PASSWORD") ?: "android"
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }`;
+    gradle = gradle.replace('    buildTypes {', signingBlock);
+  }
+
   if (!gradle.includes('com.google.zxing:core')) {
     gradle = gradle.replace(
       "implementation project(':capacitor-android')",
       "implementation project(':capacitor-android')\n    implementation 'com.google.zxing:core:3.5.3'"
     );
+  }
+
+  if (gradle !== original) {
     fs.writeFileSync(APP_BUILD_GRADLE, gradle, 'utf8');
-    console.log('android/app/build.gradle mis a jour avec ZXing core 3.5.3.');
+    console.log(`android/app/build.gradle mis a jour (versionCode=${versionCode}, versionName=${pkgVersion}, signingConfigs.debug).`);
   }
 }
 

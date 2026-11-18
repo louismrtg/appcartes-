@@ -1,4 +1,4 @@
-export const APP_VERSION = '2.2.0';
+export const APP_VERSION = '2.2.1';
 export const GITHUB_REPO = 'louismrtg/appcartes-';
 
 export type SortMode = 'default' | 'most_used' | 'recent' | 'alpha';

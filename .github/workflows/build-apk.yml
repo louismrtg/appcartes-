@@ -50,12 +50,6 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Conserver la clé de signature debug entre les builds
-        uses: actions/cache@v4
-        with:
-          path: ~/.android
-          key: ${{ runner.os }}-android-debug-keystore-v1
-
       - name: Compiler l'application Web (TypeScript + Vite)
         run: npm run build
 
@@ -68,6 +62,9 @@ jobs:
 
       - name: Injecter les permissions et le Widget natif Android
         run: node scripts/configure-android.js
+
+      - name: Vérifier la clé de signature Android
+        run: keytool -list -keystore android/app/debug.keystore -storepass android
 
       - name: Compiler l'APK Debug avec Gradle
         run: |
