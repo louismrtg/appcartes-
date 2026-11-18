@@ -1,0 +1,51 @@
+{
+  "name": "mes-cartes",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Mes Cartes — Portefeuille de cartes de fidélité et coffre-fort personnel Android hors-ligne — © Louis Martignon (@louismrtg)",
+  "author": "Louis Martignon (@louismrtg)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "cap:sync": "npm run build && npx cap sync android && node scripts/configure-android.js",
+    "android:prepare": "npx cap add android && npx cap sync android && node scripts/configure-android.js"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "7.2.0",
+    "@capacitor-community/keep-awake": "5.0.1",
+    "@capacitor-community/screen-brightness": "6.0.0",
+    "@capacitor-mlkit/barcode-scanning": "6.2.0",
+    "@capacitor/android": "6.2.1",
+    "@capacitor/app": "6.0.2",
+    "@capacitor/core": "6.2.1",
+    "@capacitor/filesystem": "6.0.3",
+    "@capacitor/haptics": "6.0.2",
+    "@capacitor/preferences": "6.0.3",
+    "@capacitor/screen-orientation": "6.0.3",
+    "@capacitor/share": "6.0.3",
+    "bwip-js": "^4.5.1",
+    "dexie": "^4.0.10",
+    "framer-motion": "^11.11.17",
+    "html5-qrcode": "^2.3.8",
+    "jsbarcode": "^3.11.6",
+    "lucide-react": "^0.460.0",
+    "qrcode.react": "^4.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "6.2.1",
+    "@types/jsbarcode": "^3.11.4",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "~5.6.2",
+    "vite": "^5.4.10"
+  }
+}

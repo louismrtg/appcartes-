@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mes Cartes</string>
+    <string name="title_activity_main">Mes Cartes</string>
+    <string name="package_name">com.famille.mescartes</string>
+    <string name="custom_url_scheme">com.famille.mescartes</string>
+    <string name="widget_quick_name">Mes Cartes — Acces Rapide (3 Cartes)</string>
+    <string name="widget_quick_description">Acces direct en un appui vers vos 3 cartes favorites.</string>
+    <string name="widget_barcode_name">Mes Cartes — Carte Favorite Directe</string>
+    <string name="widget_barcode_description">Affiche directement le code-barres de votre carte principale.</string>
+</resources>

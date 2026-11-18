@@ -1,0 +1,86 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-apk:
+    name: Compiler APK Android (Mes Cartes)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Installer Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Configurer Android SDK & Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('package.json', 'scripts/configure-android.js') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Installer les dépendances npm
+        run: npm install
+
+      - name: Compiler l'application Web (TypeScript + Vite)
+        run: npm run build
+
+      - name: Initialiser et synchroniser Capacitor Android
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Injecter les permissions et le Widget natif Android
+        run: node scripts/configure-android.js
+
+      - name: Compiler l'APK Debug avec Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Publier l'APK en tant qu'Artifact GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: MesCartes-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 90
+
+      - name: Créer / Mettre à jour la GitHub Release téléchargeable
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: v1.0.0-latest
+          name: Mes Cartes — Dernier APK Android
+          body: |
+            Build Android automatique généré depuis `${{ github.sha }}`.
+            Téléchargez **`app-debug.apk`** ci-dessous pour installer **Mes Cartes** sur votre téléphone Android.
+            © Louis Martignon (`@louismrtg`)
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

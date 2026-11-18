@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    font-family: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, sans-serif;
+    overscroll-behavior-y: contain;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html.accessibility-large {
+    font-size: 18.5px;
+  }
+
+  html.accessibility-high-contrast body {
+    background-color: #ffffff;
+    color: #020617;
+  }
+
+  html.dark.accessibility-high-contrast body {
+    background-color: #000000;
+    color: #ffffff;
+  }
+
+  html.accessibility-high-contrast .hc-surface {
+    background-color: #ffffff !important;
+    border-color: #0f172a !important;
+    border-width: 2px !important;
+  }
+
+  html.dark.accessibility-high-contrast .hc-surface {
+    background-color: #0a0b0e !important;
+    border-color: #e2e8f0 !important;
+    border-width: 2px !important;
+  }
+
+  html.accessibility-high-contrast .hc-muted {
+    color: #1e293b !important;
+  }
+
+  html.dark.accessibility-high-contrast .hc-muted {
+    color: #e2e8f0 !important;
+  }
+}
+
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 12px);
+}
+
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
