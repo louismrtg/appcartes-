@@ -27,6 +27,7 @@ import { WidgetService } from './services/WidgetService';
 import { HapticService } from './services/HapticService';
 import { BiometricService } from './services/BiometricService';
 import { OrientationService } from './services/OrientationService';
+import { AvailableUpdate, UpdateService } from './services/UpdateService';
 import { LoyaltyCardItem } from './components/LoyaltyCardItem';
 import { BrandLogo } from './components/BrandLogo';
 
@@ -47,6 +48,9 @@ const BulkCategoryModal = lazy(() =>
 );
 const SecurityLockModal = lazy(() =>
   import('./components/SecurityLockModal').then((m) => ({ default: m.SecurityLockModal }))
+);
+const UpdatePromptModal = lazy(() =>
+  import('./components/UpdatePromptModal').then((m) => ({ default: m.UpdatePromptModal }))
 );
 
 const SORT_LABELS: Record<SortMode, string> = {
@@ -107,6 +111,7 @@ export function App() {
   const [appLocked, setAppLocked] = useState(false);
   const [unlockedPrivateFolders, setUnlockedPrivateFolders] = useState<Record<string, boolean>>({});
   const [pendingPrivateFolderId, setPendingPrivateFolderId] = useState<string | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
 
   const edgeSwipeStartX = useRef<number | null>(null);
   const backgroundTimestampRef = useRef<number | null>(null);
@@ -255,6 +260,27 @@ export function App() {
       WidgetService.syncPinnedCards(cards);
     }
   }, [cards, loading]);
+
+  // Vérification silencieuse en arrière-plan d'une mise à jour GitHub au lancement
+  useEffect(() => {
+    if (loading || appLocked) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const result = await UpdateService.checkForUpdate();
+      if (cancelled) return;
+      if (
+        result.status === 'available' &&
+        !UpdateService.isDismissedForSession(result.update.version)
+      ) {
+        setAvailableUpdate(result.update);
+      }
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [loading, appLocked]);
 
   const folderMap = useMemo(() => {
     const map: Record<string, CardFolder> = {};
@@ -936,6 +962,10 @@ export function App() {
               onUpdateSettings={handleUpdateSettings}
               onToggleWidgetPin={handleToggleWidgetPin}
               onSetMainWidgetCard={handleSetMainWidgetCard}
+              onUpdateFound={(upd) => {
+                setSettingsModalOpen(false);
+                setAvailableUpdate(upd);
+              }}
               onDataImported={async () => {
                 await reloadDatabase();
               }}
@@ -973,6 +1003,20 @@ export function App() {
                 }));
                 setActiveFilter({ type: 'folder', folderId: pendingPrivateFolderId });
                 setPendingPrivateFolderId(null);
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
+      {/* Pop-up de mise à jour GitHub détectée */}
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {availableUpdate && (
+            <UpdatePromptModal
+              update={availableUpdate}
+              onDismiss={() => {
+                UpdateService.dismissForSession(availableUpdate.version);
+                setAvailableUpdate(null);
               }}
             />
           )}

@@ -34,6 +34,7 @@ import {
 } from '../types';
 import { BiometricService } from '../services/BiometricService';
 import { StorageService } from '../services/StorageService';
+import { AvailableUpdate, UpdateService } from '../services/UpdateService';
 import { SecurityLockModal } from './SecurityLockModal';
 import { BrandLogo } from './BrandLogo';
 
@@ -43,6 +44,7 @@ interface SettingsModalProps {
   onUpdateSettings: (next: AppSettings) => Promise<void>;
   onToggleWidgetPin: (card: LoyaltyCard) => Promise<void>;
   onSetMainWidgetCard: (cardId: string) => Promise<void>;
+  onUpdateFound?: (update: AvailableUpdate) => void;
   onDataImported: () => Promise<void>;
   onClose: () => void;
 }
@@ -53,6 +55,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateSettings,
   onToggleWidgetPin,
   onSetMainWidgetCard,
+  onUpdateFound,
   onDataImported,
   onClose,
 }) => {
@@ -71,36 +74,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setCheckingUpdate(true);
     setUpdateStatus(null);
     try {
-      const response = await fetch(
-        `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
-        { headers: { Accept: 'application/vnd.github+json' } }
-      );
-      if (!response.ok) {
+      const result = await UpdateService.checkForUpdate();
+      if (result.status === 'available') {
+        if (onUpdateFound) {
+          onUpdateFound(result.update);
+          return;
+        }
         setUpdateStatus({
-          message:
-            'Accès direct indisponible (dépôt privé ou hors-ligne). Ouvrez la page GitHub Releases pour installer la dernière version.',
-          downloadUrl: `https://github.com/${GITHUB_REPO}/releases`,
+          message: `Nouvelle mise à jour v${result.update.version} disponible.`,
+          downloadUrl: result.update.apkUrl,
         });
         return;
       }
-      const data = (await response.json()) as {
-        tag_name?: string;
-        html_url?: string;
-        assets?: Array<{ name: string; browser_download_url: string }>;
-      };
-      const apkAsset = data.assets?.find((a) => a.name.toLowerCase().endsWith('.apk'));
-      const latestTag = data.tag_name || 'Dernière build';
-      setUpdateStatus({
-        message: `Dernière build détectée : ${latestTag}. Téléchargez l’APK ci-dessous pour mettre à jour en conservant vos cartes.`,
-        downloadUrl:
-          apkAsset?.browser_download_url ||
-          data.html_url ||
-          `https://github.com/${GITHUB_REPO}/releases`,
-      });
-    } catch {
+      if (result.status === 'up-to-date') {
+        setUpdateStatus({
+          message: `Vous utilisez déjà la dernière version (v${APP_VERSION}).`,
+        });
+        return;
+      }
+      if (result.status === 'offline') {
+        setUpdateStatus({
+          message: 'Aucune connexion internet détectée.',
+        });
+        return;
+      }
       setUpdateStatus({
         message:
-          'Impossible de joindre GitHub pour le moment. Vérifiez votre connexion ou ouvrez GitHub Releases.',
+          'Vérification directe impossible (dépôt GitHub privé ou aucune Release publique). Passez le dépôt en Public ou ouvrez les Releases GitHub ci-dessous.',
         downloadUrl: `https://github.com/${GITHUB_REPO}/releases`,
       });
     } finally {

@@ -44,6 +44,16 @@ jobs:
       - name: Installer les dépendances npm
         run: npm install
 
+      - name: Lire la version depuis package.json
+        id: pkg
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Conserver la clé de signature debug entre les builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.android
+          key: ${{ runner.os }}-android-debug-keystore-v1
+
       - name: Compiler l'application Web (TypeScript + Vite)
         run: npm run build
 
@@ -74,8 +84,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
-          tag_name: v2.1.0
-          name: Mes Cartes v2.1.0 — APK Android
+          tag_name: v${{ steps.pkg.outputs.version }}
+          name: Mes Cartes v${{ steps.pkg.outputs.version }} — APK Android
           body: |
             Build Android automatique généré depuis `${{ github.sha }}`.
             Téléchargez **`app-debug.apk`** ci-dessous pour installer **Mes Cartes** sur votre téléphone Android.
