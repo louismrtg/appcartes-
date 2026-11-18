@@ -18,11 +18,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'auto',
   largeText: false,
   highContrast: false,
+  defaultCheckoutOrientation: 'landscape',
   autoLandscape: true,
   forceLandscapeCheckout: true,
   lockAppLandscape: false,
   autoMaxBrightness: true,
   keepAwake: true,
+  hapticIntensity: 'off',
   hapticFeedback: false,
   hapticMigrated: true,
   sortMode: 'default',
@@ -126,9 +128,25 @@ class StorageServiceImpl {
       if (!value) return { ...DEFAULT_SETTINGS };
       const parsed = JSON.parse(value) as Partial<AppSettings>;
       const merged: AppSettings = { ...DEFAULT_SETTINGS, ...parsed };
+      let needsSave = false;
+
       if (parsed.hapticMigrated !== true) {
         merged.hapticFeedback = false;
+        merged.hapticIntensity = 'off';
         merged.hapticMigrated = true;
+        needsSave = true;
+      } else if (!parsed.hapticIntensity) {
+        merged.hapticIntensity = parsed.hapticFeedback ? 'subtle' : 'off';
+        needsSave = true;
+      }
+
+      if (!parsed.defaultCheckoutOrientation) {
+        merged.defaultCheckoutOrientation =
+          parsed.autoLandscape === false ? 'portrait' : 'landscape';
+        needsSave = true;
+      }
+
+      if (needsSave) {
         await this.saveSettings(merged);
       }
       return merged;

@@ -1,7 +1,9 @@
-export const APP_VERSION = '2.1.0';
+export const APP_VERSION = '2.2.0';
 export const GITHUB_REPO = 'louismrtg/appcartes-';
 
 export type SortMode = 'default' | 'most_used' | 'recent' | 'alpha';
+export type HapticIntensity = 'off' | 'subtle' | 'light' | 'medium';
+export type CheckoutOrientation = 'landscape' | 'portrait';
 
 export type BarcodeFormat =
   | 'EAN_13'
@@ -56,6 +58,8 @@ export interface LoyaltyCard {
   secondaryColor: string;
   textColor: string;
   notes?: string;
+  balance?: string;
+  expiryDate?: string;
   isFavorite: boolean;
   isPinnedWidget: boolean;
   widgetOrder: number;
@@ -99,11 +103,13 @@ export interface AppSettings {
   theme: ThemePreference;
   largeText: boolean;
   highContrast: boolean;
+  defaultCheckoutOrientation: CheckoutOrientation;
   autoLandscape: boolean;
   forceLandscapeCheckout: boolean;
   lockAppLandscape: boolean;
   autoMaxBrightness: boolean;
   keepAwake: boolean;
+  hapticIntensity: HapticIntensity;
   hapticFeedback: boolean;
   hapticMigrated?: boolean;
   sortMode: SortMode;

@@ -10,7 +10,6 @@ import {
   KeyRound,
   Loader2,
   Lock,
-  Maximize2,
   Moon,
   RefreshCw,
   RotateCw,
@@ -27,12 +26,15 @@ import {
 import {
   APP_VERSION,
   AppSettings,
+  CheckoutOrientation,
   GITHUB_REPO,
+  HapticIntensity,
   LockScope,
   LoyaltyCard,
   ThemePreference,
 } from '../types';
 import { BiometricService } from '../services/BiometricService';
+import { HapticService } from '../services/HapticService';
 import { StorageService } from '../services/StorageService';
 import { AvailableUpdate, UpdateService } from '../services/UpdateService';
 import { SecurityLockModal } from './SecurityLockModal';
@@ -304,45 +306,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
               </label>
 
-              <label className="flex items-center justify-between p-4 cursor-pointer">
-                <span className="flex items-center gap-3 pr-3">
-                  <RotateCw className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
-                  <span>
+              <div className="p-4 space-y-2.5">
+                <div className="flex items-start gap-3">
+                  <RotateCw className="w-4 h-4 text-slate-500 hc-muted shrink-0 mt-0.5" strokeWidth={1.75} />
+                  <div>
                     <span className="block font-semibold text-sm text-slate-900 dark:text-white">
-                      Basculer en Paysage à l’ouverture
+                      Orientation par défaut à l’ouverture d’une carte
                     </span>
                     <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
-                      Élargit le code-barres pour la douchette laser
+                      Modifiable à tout moment d’un appui dans la carte affichée
                     </span>
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={settings.autoLandscape}
-                  onChange={(e) => toggleSetting('autoLandscape', e.target.checked)}
-                  className="w-5 h-5 accent-blue-600 shrink-0"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-4 cursor-pointer">
-                <span className="flex items-center gap-3 pr-3">
-                  <Maximize2 className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
-                  <span>
-                    <span className="block font-semibold text-sm text-slate-900 dark:text-white">
-                      Forcer le Paysage plein écran (code-barres)
-                    </span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
-                      Bloque en horizontal sans retour portrait et étend le code-barres
-                    </span>
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={settings.forceLandscapeCheckout}
-                  onChange={(e) => toggleSetting('forceLandscapeCheckout', e.target.checked)}
-                  className="w-5 h-5 accent-blue-600 shrink-0"
-                />
-              </label>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { id: 'landscape', label: 'Paysage (défaut)' },
+                      { id: 'portrait', label: 'Portrait' },
+                    ] as { id: CheckoutOrientation; label: string }[]
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() =>
+                        onUpdateSettings({
+                          ...settings,
+                          defaultCheckoutOrientation: opt.id,
+                          autoLandscape: opt.id === 'landscape',
+                        })
+                      }
+                      className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors ${
+                        (settings.defaultCheckoutOrientation || 'landscape') === opt.id
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                          : 'bg-[#F7F8FA] dark:bg-[#0D0E12] text-slate-600 dark:text-slate-300 border border-slate-200/70 dark:border-slate-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <label className="flex items-center justify-between p-4 cursor-pointer">
                 <span className="flex items-center gap-3 pr-3">
@@ -384,25 +387,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
               </label>
 
-              <label className="flex items-center justify-between p-4 cursor-pointer">
-                <span className="flex items-center gap-3 pr-3">
-                  <Vibrate className="w-4 h-4 text-slate-500 hc-muted shrink-0" strokeWidth={1.75} />
-                  <span>
+              <div className="p-4 space-y-2.5">
+                <div className="flex items-start gap-3">
+                  <Vibrate className="w-4 h-4 text-slate-500 hc-muted shrink-0 mt-0.5" strokeWidth={1.75} />
+                  <div>
                     <span className="block font-semibold text-sm text-slate-900 dark:text-white">
-                      Retour tactile doux (vibrations)
+                      Intensité des vibrations
                     </span>
                     <span className="block text-xs text-slate-500 dark:text-slate-400 hc-muted">
-                      Désactivé par défaut · micro-impulsion très discrète
+                      Réglage précis avec aperçu tactile immédiat au toucher
                     </span>
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={settings.hapticFeedback}
-                  onChange={(e) => toggleSetting('hapticFeedback', e.target.checked)}
-                  className="w-5 h-5 accent-blue-600 shrink-0"
-                />
-              </label>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(
+                    [
+                      { id: 'off', label: 'Aucun' },
+                      { id: 'subtle', label: 'Très doux' },
+                      { id: 'light', label: 'Doux' },
+                      { id: 'medium', label: 'Moyen' },
+                    ] as { id: HapticIntensity; label: string }[]
+                  ).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={async () => {
+                        await HapticService.test(item.id);
+                        await onUpdateSettings({
+                          ...settings,
+                          hapticIntensity: item.id,
+                          hapticFeedback: item.id !== 'off',
+                        });
+                      }}
+                      className={`py-2.5 px-1.5 rounded-xl text-[11px] font-semibold transition-colors ${
+                        (settings.hapticIntensity || 'off') === item.id
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                          : 'bg-[#F7F8FA] dark:bg-[#0D0E12] text-slate-600 dark:text-slate-300 border border-slate-200/70 dark:border-slate-800'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 

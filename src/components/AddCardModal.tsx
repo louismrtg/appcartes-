@@ -92,6 +92,8 @@ export const AddCardModal: React.FC<AddCardModalProps> = ({
   const [newCategoryColor, setNewCategoryColor] = useState(NEW_CATEGORY_COLORS[0]);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [notes, setNotes] = useState(editingCard?.notes || '');
+  const [balance, setBalance] = useState(editingCard?.balance || '');
+  const [expiryDate, setExpiryDate] = useState(editingCard?.expiryDate || '');
   const [isFavorite, setIsFavorite] = useState(editingCard?.isFavorite || false);
   const [isPinnedWidget, setIsPinnedWidget] = useState(editingCard?.isPinnedWidget || false);
   const [primaryColor, setPrimaryColor] = useState(editingCard?.primaryColor || '#1E293B');
@@ -296,6 +298,8 @@ export const AddCardModal: React.FC<AddCardModalProps> = ({
         secondaryColor,
         textColor,
         notes: notes.trim() || undefined,
+        balance: balance.trim() || undefined,
+        expiryDate: expiryDate.trim() || undefined,
         isFavorite,
         isPinnedWidget,
         widgetOrder: editingCard?.widgetOrder ?? (isPinnedWidget ? 10 : 99),
@@ -811,9 +815,35 @@ export const AddCardModal: React.FC<AddCardModalProps> = ({
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ex: Code secret ou solde"
+                  placeholder="Ex: Code PIN ou information utile"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7F8FA] dark:bg-[#0D0E12] border border-slate-200 dark:border-slate-800 text-sm"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                    Solde / Avoir (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={balance}
+                    onChange={(e) => setBalance(e.target.value)}
+                    placeholder="Ex: 45,00 €"
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#F7F8FA] dark:bg-[#0D0E12] border border-slate-200 dark:border-slate-800 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                    Expiration (optionnel)
+                  </label>
+                  <input
+                    type="date"
+                    value={expiryDate}
+                    onChange={(e) => setExpiryDate(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#F7F8FA] dark:bg-[#0D0E12] border border-slate-200 dark:border-slate-800 text-sm"
+                  />
+                </div>
               </div>
             </div>
 

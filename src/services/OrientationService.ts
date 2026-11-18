@@ -28,9 +28,39 @@ class OrientationServiceImpl {
         await orientationApi.lock('landscape');
       }
     } catch {
-      // Sur navigateur desktop ou sans plein écran, l'interface reste utilisable.
+      // Ignoré sur navigateur desktop
     }
     this.currentLock = 'landscape';
+    return true;
+  }
+
+  async lockPortrait(): Promise<boolean> {
+    if (this.currentLock === 'portrait') {
+      return true;
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await ScreenOrientation.lock({ orientation: 'portrait' });
+        this.currentLock = 'portrait';
+        return true;
+      } catch (err) {
+        console.warn('[OrientationService] Échec du verrouillage portrait natif:', err);
+        return false;
+      }
+    }
+
+    try {
+      const orientationApi = window.screen?.orientation as ScreenOrientation & {
+        lock?: (orientation: string) => Promise<void>;
+      };
+      if (orientationApi && typeof orientationApi.lock === 'function') {
+        await orientationApi.lock('portrait');
+      }
+    } catch {
+      // Ignoré sur navigateur desktop
+    }
+    this.currentLock = 'portrait';
     return true;
   }
 

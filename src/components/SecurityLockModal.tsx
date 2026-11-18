@@ -39,10 +39,10 @@ export const SecurityLockModal: React.FC<SecurityLockModalProps> = ({
         : 'Déverrouiller votre portefeuille Mes Cartes';
     const ok = await BiometricService.authenticate(reason);
     if (ok) {
-      await HapticService.success(settings.hapticFeedback);
+      await HapticService.success(settings.hapticIntensity);
       onUnlock();
     }
-  }, [isSetup, mode, onUnlock, settings.biometricEnabled, settings.hapticFeedback]);
+  }, [isSetup, mode, onUnlock, settings.biometricEnabled, settings.hapticIntensity]);
 
   useEffect(() => {
     let active = true;
@@ -67,7 +67,7 @@ export const SecurityLockModal: React.FC<SecurityLockModalProps> = ({
 
   const handleDigit = async (digit: string) => {
     if (verifying || enteredPin.length >= pinLength) return;
-    HapticService.tap(settings.hapticFeedback);
+    HapticService.tap(settings.hapticIntensity);
     setErrorMsg(null);
     const next = enteredPin + digit;
     setEnteredPin(next);
@@ -87,7 +87,7 @@ export const SecurityLockModal: React.FC<SecurityLockModalProps> = ({
         setVerifying(true);
         try {
           const { hash, salt } = await BiometricService.hashPin(next);
-          await HapticService.success(settings.hapticFeedback);
+          await HapticService.success(settings.hapticIntensity);
           if (onPinConfigured) {
             await onPinConfigured(hash, salt, pinLength);
           }
@@ -96,7 +96,7 @@ export const SecurityLockModal: React.FC<SecurityLockModalProps> = ({
           setVerifying(false);
         }
       } else {
-        await HapticService.error(settings.hapticFeedback);
+        await HapticService.error(settings.hapticIntensity);
         setShake(true);
         setTimeout(() => setShake(false), 400);
         setErrorMsg('Les deux codes PIN ne correspondent pas.');
@@ -110,10 +110,10 @@ export const SecurityLockModal: React.FC<SecurityLockModalProps> = ({
     try {
       const valid = await BiometricService.verifyPin(next, settings.pinHash, settings.pinSalt);
       if (valid) {
-        await HapticService.success(settings.hapticFeedback);
+        await HapticService.success(settings.hapticIntensity);
         onUnlock();
       } else {
-        await HapticService.error(settings.hapticFeedback);
+        await HapticService.error(settings.hapticIntensity);
         setShake(true);
         setTimeout(() => setShake(false), 400);
         setErrorMsg('Code PIN incorrect.');
@@ -126,7 +126,7 @@ export const SecurityLockModal: React.FC<SecurityLockModalProps> = ({
 
   const handleBackspace = () => {
     if (verifying || enteredPin.length === 0) return;
-    HapticService.tap(settings.hapticFeedback);
+    HapticService.tap(settings.hapticIntensity);
     setEnteredPin((prev) => prev.slice(0, -1));
   };
 

@@ -46,6 +46,14 @@ export const LoyaltyCardItem = React.forwardRef<HTMLDivElement, LoyaltyCardItemP
     const displayedFolders = folderNames.slice(0, 2);
     const extraFoldersCount = Math.max(0, folderNames.length - 2);
 
+    let expiryBadge: string | null = null;
+    if (card.expiryDate) {
+      const targetMs = new Date(`${card.expiryDate}T23:59:59`).getTime();
+      const diffDays = Math.ceil((targetMs - Date.now()) / 86_400_000);
+      if (diffDays < 0) expiryBadge = 'Expirée';
+      else if (diffDays <= 30) expiryBadge = `Expire (${diffDays}j)`;
+    }
+
     const cancelLongPress = () => {
       if (longPressTimerRef.current !== null) {
         window.clearTimeout(longPressTimerRef.current);
@@ -167,6 +175,20 @@ export const LoyaltyCardItem = React.forwardRef<HTMLDivElement, LoyaltyCardItemP
               </h3>
               {showBrandSubtitle && (
                 <p className="text-xs font-semibold opacity-85 truncate">{card.brandName}</p>
+              )}
+              {(card.balance || expiryBadge) && (
+                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                  {card.balance && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-white/20">
+                      {card.balance}
+                    </span>
+                  )}
+                  {expiryBadge && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-500/80 text-white">
+                      {expiryBadge}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>

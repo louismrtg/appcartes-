@@ -307,7 +307,7 @@ export function App() {
 
   const handleSelectFilter = useCallback(
     async (filter: DrawerFilter) => {
-      await HapticService.tap(settings.hapticFeedback);
+      await HapticService.tap(settings.hapticIntensity);
       if (typeof filter === 'object' && filter.type === 'folder') {
         const targetFolder = folderMap[filter.folderId];
         if (
@@ -410,7 +410,7 @@ export function App() {
 
   const handleOpenCardCheckout = useCallback(
     async (card: LoyaltyCard) => {
-      await HapticService.tap(settings.hapticFeedback);
+      await HapticService.tap(settings.hapticIntensity);
       const updated = await StorageService.incrementCardUsage(card.id);
       if (updated) {
         setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
@@ -419,7 +419,7 @@ export function App() {
         setCheckoutCard(card);
       }
     },
-    [settings.hapticFeedback]
+    [settings.hapticIntensity]
   );
 
   const handleCloseCheckout = useCallback(() => {
@@ -428,11 +428,11 @@ export function App() {
 
   const handleLongPressCard = useCallback(
     async (card: LoyaltyCard) => {
-      await HapticService.tap(settings.hapticFeedback);
+      await HapticService.tap(settings.hapticIntensity);
       setConfirmBulkDelete(false);
       setSelectedCardIds((prev) => (prev.includes(card.id) ? prev : [...prev, card.id]));
     },
-    [settings.hapticFeedback]
+    [settings.hapticIntensity]
   );
 
   const handleToggleCardSelection = useCallback((card: LoyaltyCard) => {
@@ -455,7 +455,7 @@ export function App() {
       return;
     }
     await StorageService.bulkDeleteCards(selectedCardIds);
-    await HapticService.tap(settings.hapticFeedback);
+    await HapticService.tap(settings.hapticIntensity);
     const refreshed = await StorageService.getCards();
     setCards(refreshed);
     setSelectedCardIds([]);
@@ -464,7 +464,7 @@ export function App() {
 
   const handleBulkApplyFolders = async (addIds: string[], removeIds: string[]) => {
     await StorageService.bulkUpdateCardsFolders(selectedCardIds, addIds, removeIds);
-    await HapticService.success(settings.hapticFeedback);
+    await HapticService.success(settings.hapticIntensity);
     const refreshed = await StorageService.getCards();
     setCards(refreshed);
     setSelectedCardIds([]);
@@ -472,7 +472,7 @@ export function App() {
 
   const handleSaveCard = async (card: LoyaltyCard) => {
     await StorageService.saveCard(card);
-    await HapticService.success(settings.hapticFeedback);
+    await HapticService.success(settings.hapticIntensity);
     const refreshed = await StorageService.getCards();
     setCards(refreshed);
     if (checkoutCard?.id === card.id) {
@@ -483,17 +483,17 @@ export function App() {
   const handleDeleteCard = useCallback(
     async (cardId: string) => {
       await StorageService.deleteCard(cardId);
-      await HapticService.tap(settings.hapticFeedback);
+      await HapticService.tap(settings.hapticIntensity);
       setCards((prev) => prev.filter((c) => c.id !== cardId));
       setCheckoutCard(null);
     },
-    [settings.hapticFeedback]
+    [settings.hapticIntensity]
   );
 
   const handleToggleFavorite = useCallback(
     async (card: LoyaltyCard, e?: React.MouseEvent) => {
       e?.stopPropagation();
-      await HapticService.tap(settings.hapticFeedback);
+      await HapticService.tap(settings.hapticIntensity);
       const updated: LoyaltyCard = {
         ...card,
         isFavorite: !card.isFavorite,
@@ -503,11 +503,11 @@ export function App() {
       setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       setCheckoutCard((cur) => (cur?.id === updated.id ? updated : cur));
     },
-    [settings.hapticFeedback]
+    [settings.hapticIntensity]
   );
 
   const handleToggleWidgetPin = async (card: LoyaltyCard) => {
-    await HapticService.tap(settings.hapticFeedback);
+    await HapticService.tap(settings.hapticIntensity);
     const nextPin = !card.isPinnedWidget;
     const pinnedCount = cards.filter((c) => c.isPinnedWidget).length;
     const updated: LoyaltyCard = {
@@ -521,7 +521,7 @@ export function App() {
   };
 
   const handleSetMainWidgetCard = async (cardId: string) => {
-    await HapticService.tap(settings.hapticFeedback);
+    await HapticService.tap(settings.hapticIntensity);
     const nextCards = cards.map((c) => ({
       ...c,
       isMainWidgetCard: c.id === cardId,
@@ -824,7 +824,7 @@ export function App() {
             <button
               type="button"
               onClick={() => {
-                HapticService.tap(settings.hapticFeedback);
+                HapticService.tap(settings.hapticIntensity);
                 setDrawerOpen(true);
               }}
               className="w-12 h-12 rounded-2xl bg-[#F7F8FA] dark:bg-[#1B1E27] border border-slate-200/80 dark:border-slate-800 flex items-center justify-center text-slate-800 dark:text-slate-100 shrink-0 active:scale-95 transition-transform"
@@ -860,7 +860,7 @@ export function App() {
             <button
               type="button"
               onClick={() => {
-                HapticService.tap(settings.hapticFeedback);
+                HapticService.tap(settings.hapticIntensity);
                 setEditingCard(null);
                 setAddModalOpen(true);
               }}
